@@ -1,0 +1,28 @@
+:root {
+  --bg: #f4f7fb;
+  --surface: #ffffff;
+  --surface-alt: #edf2f9;
+  --ink: #102438;
+  --ink-muted: #526477;
+  --accent: #006c7f;
+  --accent-strong: #004f5d;
+  --danger: #bb1f29;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body {
+  margin: 0;
+  min-height: 100%;
+  font-family: 'Manrope', sans-serif;
+  background: radial-gradient(circle at 15% 20%, #d4e8ff 0%, transparent 30%),
+    radial-gradient(circle at 85% 0%, #d7f6f8 0%, transparent 25%), var(--bg);
+  color: var(--ink);
+}
+
+a {
+  color: inherit;
+}

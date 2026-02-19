@@ -1,0 +1,17 @@
+node_modules
+.turbo
+dist
+build
+coverage
+.env
+.env.local
+.env.*.local
+!.env.example
+*.log
+apps/api/.next
+apps/web/.angular
+apps/web/dist
+apps/web/coverage
+apps/web/test-results
+apps/web/playwright-report
+packages/db/generated

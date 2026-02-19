@@ -1,0 +1,15 @@
+{
+  "name": "@nms/eslint-config",
+  "version": "0.1.0",
+  "private": true,
+  "type": "commonjs",
+  "main": "base.cjs",
+  "files": ["base.cjs", "next.cjs", "angular.cjs"],
+  "peerDependencies": {
+    "@typescript-eslint/eslint-plugin": "^8.46.2",
+    "@typescript-eslint/parser": "^8.46.2",
+    "eslint": "^9.39.1",
+    "eslint-config-next": "^16.1.6",
+    "typescript": "^5.9.3"
+  }
+}

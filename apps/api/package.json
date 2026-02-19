@@ -1,0 +1,39 @@
+{
+  "name": "@nms/api",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "next dev -p 3000",
+    "build": "next build",
+    "start": "next start -p 3000",
+    "lint": "eslint .",
+    "test": "vitest run",
+    "test:watch": "vitest"
+  },
+  "dependencies": {
+    "@nms/db": "workspace:*",
+    "@nms/shared": "workspace:*",
+    "argon2": "^0.44.0",
+    "bcryptjs": "^3.0.3",
+    "bullmq": "^5.69.3",
+    "ioredis": "^5.8.1",
+    "next": "^16.1.6",
+    "nodemailer": "^7.0.10",
+    "react": "^19.2.0",
+    "react-dom": "^19.2.0",
+    "zod": "^4.1.12"
+  },
+  "devDependencies": {
+    "@nms/eslint-config": "workspace:*",
+    "@types/node": "^24.10.0",
+    "@types/nodemailer": "^7.0.3",
+    "@types/react": "^19.2.2",
+    "@types/react-dom": "^19.2.2",
+    "eslint": "^9.39.1",
+    "eslint-config-next": "^16.1.6",
+    "supertest": "^7.1.4",
+    "typescript": "^5.9.3",
+    "vitest": "^3.2.4"
+  }
+}

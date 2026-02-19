@@ -1,0 +1,56 @@
+name: CI
+
+on:
+  pull_request:
+  push:
+    branches:
+      - main
+      - dev
+
+jobs:
+  ci:
+    runs-on: ubuntu-latest
+    env:
+      NODE_ENV: test
+      APP_URL: http://localhost:4200
+      COMPANY_EMAIL_DOMAIN: "@kinet.sk"
+      DATABASE_URL: postgresql://nms:nms@localhost:5432/nms?schema=public
+      REDIS_URL: redis://localhost:6379
+      ENCRYPTION_KEY: dGVzdF9rZXlfMzJfYnl0ZXNfYmFzZTY0X3ZhbHVlXw==
+      EMAIL_FROM: nms-ci@kinet.sk
+      SMTP_HOST: localhost
+      SMTP_PORT: "1025"
+      SMTP_USER: ""
+      SMTP_PASS: ""
+      ZABBIX_URL: http://localhost/zabbix
+      ZABBIX_USER: Admin
+      ZABBIX_PASS: zabbix
+      SYNC_CRON: "*/30 * * * *"
+      CI: true
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+
+      - name: Enable Corepack
+        run: corepack enable
+
+      - name: Install dependencies
+        run: corepack pnpm install --frozen-lockfile
+
+      - name: Generate Prisma client
+        run: corepack pnpm --filter @nms/db prisma generate
+
+      - name: Lint
+        run: corepack pnpm lint
+
+      - name: Test
+        run: corepack pnpm test
+
+      - name: Build
+        run: corepack pnpm build

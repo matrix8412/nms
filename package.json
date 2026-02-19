@@ -1,0 +1,21 @@
+{
+  "name": "nms-system",
+  "private": true,
+  "version": "0.1.0",
+  "packageManager": "pnpm@10.30.0",
+  "scripts": {
+    "dev": "turbo run dev --parallel",
+    "build": "turbo run build",
+    "lint": "turbo run lint",
+    "test": "turbo run test",
+    "format": "prettier --write .",
+    "format:check": "prettier --check .",
+    "db:migrate": "corepack pnpm --filter @nms/db prisma migrate deploy",
+    "db:generate": "corepack pnpm --filter @nms/db prisma generate"
+  },
+  "devDependencies": {
+    "prettier": "^3.6.2",
+    "turbo": "^2.8.10",
+    "typescript": "^5.9.3"
+  }
+}
