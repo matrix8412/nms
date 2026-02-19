@@ -11,7 +11,7 @@ function applySecurityHeaders(response: NextResponse) {
   response.headers.set('Content-Security-Policy', "default-src 'self'; frame-ancestors 'none'");
 }
 
-export function middleware(request: NextRequest) {
+export function proxy(request: NextRequest) {
   const response = NextResponse.next();
   applySecurityHeaders(response);
 

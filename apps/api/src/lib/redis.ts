@@ -11,7 +11,12 @@ export const redis =
   new Redis(env.REDIS_URL, {
     maxRetriesPerRequest: 2,
     enableReadyCheck: true,
+    lazyConnect: true,
   });
+
+redis.on('error', () => {
+  // Intentionally suppress noisy connection errors; callers handle Redis failures.
+});
 
 if (process.env.NODE_ENV !== 'production') {
   globalThis.__nmsRedis = redis;

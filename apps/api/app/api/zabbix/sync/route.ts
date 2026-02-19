@@ -5,7 +5,7 @@ import { withErrorHandling } from '@/lib/route';
 import { ok } from '@/lib/response';
 import { parseBody } from '@/lib/validation';
 import { assertCsrf } from '@/lib/auth/csrf';
-import { deviceSyncQueue } from '@/jobs/queues';
+import { getDeviceSyncQueue } from '@/jobs/queues';
 import type { NextRequest } from 'next/server';
 
 export async function POST(request: NextRequest) {
@@ -26,6 +26,7 @@ export async function POST(request: NextRequest) {
       select: { id: true },
     });
 
+    const deviceSyncQueue = getDeviceSyncQueue();
     await Promise.all(
       devices.map((device) =>
         deviceSyncQueue.add(
