@@ -4,7 +4,6 @@ import { assertCsrf } from '@/lib/auth/csrf';
 import { assertRateLimit } from '@/lib/auth/rate-limit';
 import { createSession, setSessionCookies } from '@/lib/auth/session';
 import { withErrorHandling } from '@/lib/route';
-import { ok } from '@/lib/response';
 import { parseBody } from '@/lib/validation';
 import { getClientIp, getUserAgent } from '@/lib/request-meta';
 import { loginUser } from '@/services/auth-service';

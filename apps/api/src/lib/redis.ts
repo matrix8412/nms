@@ -2,7 +2,6 @@ import Redis from 'ioredis';
 import { env } from './env';
 
 declare global {
-  // eslint-disable-next-line no-var
   var __nmsRedis: Redis | undefined;
 }
 
