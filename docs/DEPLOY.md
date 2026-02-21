@@ -79,3 +79,46 @@ corepack pnpm --filter @nms/db prisma migrate deploy
 - Collect API/worker/scheduler logs centrally.
 - Monitor queue depth and failure rates.
 - Alert on repeated auth failures and rate-limit spikes.
+
+## GitHub Actions CD
+
+Workflow:
+- `.github/workflows/cd.yml`
+
+Triggers:
+- push to `dev` -> deploy to GitHub Environment `staging`
+- push to `main` -> deploy to GitHub Environment `production`
+- manual `workflow_dispatch` with selectable target environment
+
+### Required GitHub Environment Secrets
+
+Configure these in both `staging` and `production` environments:
+- `SSH_HOST` (target server hostname/IP)
+- `SSH_PORT` (usually `22`, optional if default)
+- `SSH_USER` (deploy user)
+- `SSH_PRIVATE_KEY` (private key for `SSH_USER`)
+- `SSH_KNOWN_HOSTS` (optional but recommended; if omitted, workflow uses `ssh-keyscan`)
+- `DEPLOY_PATH` (e.g. `/opt/nms-system`)
+- `DEPLOY_ENV_FILE_PATH` (absolute path to server `.env`, e.g. `/opt/nms-system/shared/.env`)
+- `SERVICE_API` (systemd service, e.g. `nms-api.service`)
+- `SERVICE_WORKER` (systemd service, e.g. `nms-worker.service`)
+- `SERVICE_SCHEDULER` (systemd service, e.g. `nms-scheduler.service`)
+- `SERVICE_WEB` (optional, e.g. `nginx.service` if web is served by Nginx)
+- `HEALTHCHECK_URL` (optional, e.g. `https://nms.example.com/api/health`)
+- `RELEASES_TO_KEEP` (optional, default `5`)
+
+### Server Prerequisites
+
+On target server:
+- Node.js 22+ installed
+- Corepack available and enabled
+- `pnpm` available through Corepack
+- `sudo systemctl restart ...` allowed for deploy user (prefer NOPASSWD for listed services only)
+- existing environment file at `DEPLOY_ENV_FILE_PATH`
+
+Release layout created by CD:
+- `${DEPLOY_PATH}/releases/<release_id>` - immutable release directory
+- `${DEPLOY_PATH}/current` - symlink to active release
+
+Remote deployment logic is implemented in:
+- `scripts/deploy/remote-release.sh`
