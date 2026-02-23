@@ -103,7 +103,7 @@ Configure these in both `staging` and `production` environments:
 On target server:
 - Docker Engine installed
 - Docker Compose plugin installed (`docker compose`)
-- deploy user allowed to run Docker commands
+- deploy user allowed to run Docker commands (docker group) or passwordless `sudo docker`
 - existing environment file at `DEPLOY_ENV_FILE_PATH`
 
 Release layout created by CD:

@@ -28,7 +28,18 @@ if ! command -v docker >/dev/null 2>&1; then
   exit 1
 fi
 
-if ! docker compose version >/dev/null 2>&1; then
+DOCKER_CMD=("docker")
+if ! docker info >/dev/null 2>&1; then
+  if command -v sudo >/dev/null 2>&1 && sudo -n docker info >/dev/null 2>&1; then
+    DOCKER_CMD=("sudo" "docker")
+  else
+    echo "Docker daemon is not accessible for user '${USER:-unknown}'." >&2
+    echo "Add deploy user to 'docker' group or allow passwordless sudo for docker commands." >&2
+    exit 1
+  fi
+fi
+
+if ! "${DOCKER_CMD[@]}" compose version >/dev/null 2>&1; then
   echo "Docker Compose plugin is required on the server." >&2
   exit 1
 fi
@@ -57,7 +68,7 @@ ln -sfn "${ENV_FILE_PATH}" "${RELEASE_DIR}/.env"
 ln -sfn "${RELEASE_DIR}" "${CURRENT_LINK}"
 
 compose() {
-  IMAGE_TAG="${RELEASE_ID}" docker compose \
+  IMAGE_TAG="${RELEASE_ID}" "${DOCKER_CMD[@]}" compose \
     --project-name "${COMPOSE_PROJECT_NAME}" \
     --env-file "${RELEASE_DIR}/.env" \
     -f "${COMPOSE_FILE_PATH}" "$@"
