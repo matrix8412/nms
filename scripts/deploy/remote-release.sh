@@ -40,6 +40,50 @@ if ! command -v systemctl >/dev/null 2>&1; then
   exit 1
 fi
 
+load_dotenv_file() {
+  local env_file="$1"
+
+  while IFS= read -r raw_line || [[ -n "${raw_line}" ]]; do
+    local line="${raw_line%$'\r'}"
+
+    # Trim leading whitespace.
+    line="${line#"${line%%[![:space:]]*}"}"
+    [[ -z "${line}" ]] && continue
+    [[ "${line:0:1}" == "#" ]] && continue
+
+    if [[ "${line}" == export\ * ]]; then
+      line="${line#export }"
+    fi
+
+    if [[ "${line}" != *=* ]]; then
+      continue
+    fi
+
+    local key="${line%%=*}"
+    local value="${line#*=}"
+
+    # Trim key whitespace.
+    key="${key%"${key##*[![:space:]]}"}"
+    key="${key#"${key%%[![:space:]]*}"}"
+
+    if [[ ! "${key}" =~ ^[A-Za-z_][A-Za-z0-9_]*$ ]]; then
+      echo "Invalid env variable name in ${env_file}: ${key}" >&2
+      exit 1
+    fi
+
+    # Drop matching outer quotes if present.
+    if [[ ${#value} -ge 2 ]]; then
+      if [[ "${value}" == \"*\" && "${value}" == *\" ]]; then
+        value="${value:1:${#value}-2}"
+      elif [[ "${value}" == \'*\' && "${value}" == *\' ]]; then
+        value="${value:1:${#value}-2}"
+      fi
+    fi
+
+    export "${key}=${value}"
+  done < "${env_file}"
+}
+
 mkdir -p "${RELEASES_DIR}"
 rm -rf "${RELEASE_DIR}"
 mkdir -p "${RELEASE_DIR}"
@@ -59,10 +103,7 @@ ln -sfn "${ENV_FILE_PATH}" "${RELEASE_DIR}/.env"
 cd "${RELEASE_DIR}"
 corepack enable
 # Export release env vars for prisma config and build-time tooling.
-set -a
-# shellcheck disable=SC1090
-source "${RELEASE_DIR}/.env"
-set +a
+load_dotenv_file "${RELEASE_DIR}/.env"
 : "${DATABASE_URL:?DATABASE_URL must be set in deployment env file}"
 
 pnpm install --frozen-lockfile
