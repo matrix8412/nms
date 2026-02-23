@@ -52,7 +52,7 @@ corepack pnpm build
 
 3. Run DB migrations (before API startup):
 ```bash
-corepack pnpm --filter @nms/db prisma migrate deploy
+corepack pnpm db:migrate
 ```
 
 4. Start services in order:

@@ -46,8 +46,8 @@ corepack pnpm install
 
 4. Generate Prisma client and run migration.
 ```bash
-corepack pnpm --filter @nms/db prisma generate
-corepack pnpm --filter @nms/db prisma migrate deploy
+corepack pnpm db:generate
+corepack pnpm db:migrate
 ```
 
 5. Start all apps in dev mode.
@@ -76,8 +76,8 @@ corepack pnpm --filter @nms/scheduler dev
 
 Commands:
 ```bash
-corepack pnpm --filter @nms/db prisma migrate dev
-corepack pnpm --filter @nms/db prisma migrate deploy
+corepack pnpm --filter @nms/db run prisma:migrate
+corepack pnpm db:migrate
 ```
 
 ## Tests

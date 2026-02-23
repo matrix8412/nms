@@ -46,8 +46,8 @@ corepack pnpm install
 ## 5. Database Setup
 
 ```bash
-corepack pnpm --filter @nms/db prisma generate
-corepack pnpm --filter @nms/db prisma migrate deploy
+corepack pnpm db:generate
+corepack pnpm db:migrate
 ```
 
 ## 6. Run Applications

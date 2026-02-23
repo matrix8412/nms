@@ -10,8 +10,8 @@
     "test": "turbo run test",
     "format": "prettier --write .",
     "format:check": "prettier --check .",
-    "db:migrate": "corepack pnpm --filter @nms/db prisma migrate deploy",
-    "db:generate": "corepack pnpm --filter @nms/db prisma generate"
+    "db:migrate": "corepack pnpm --filter @nms/db run prisma:deploy",
+    "db:generate": "corepack pnpm --filter @nms/db run prisma:generate"
   },
   "devDependencies": {
     "prettier": "^3.6.2",
