@@ -26,11 +26,15 @@ Mandatory:
 - `APP_URL`
 - `COMPANY_EMAIL_DOMAIN`
 - `DATABASE_URL`
+- `DATABASE_URL_DOCKER` (for container networking, default points to `postgres` service)
 - `REDIS_URL`
+- `REDIS_URL_DOCKER` (for container networking, default points to `redis` service)
 - `ENCRYPTION_KEY`
 - `EMAIL_FROM`
 - `SMTP_HOST`
 - `SMTP_PORT`
+- `SMTP_HOST_DOCKER` (default `mailhog`)
+- `SMTP_PORT_DOCKER` (default `1025`)
 - `SMTP_USER`
 - `SMTP_PASS`
 - `ZABBIX_URL`
@@ -40,26 +44,16 @@ Mandatory:
 
 ## Deployment Steps
 
-1. Install dependencies:
-```bash
-corepack pnpm install --frozen-lockfile
-```
+CD deployment is fully automated via GitHub Actions:
+1. Build and test in CI.
+2. Upload immutable release archive to server.
+3. Build Docker images on server (`Dockerfile.app`, `Dockerfile.web`).
+4. Start infra containers (`postgres`, `redis`, `mailhog`).
+5. Run DB migrations in container (`migrate` service).
+6. Start app containers (`api`, `worker`, `scheduler`, `web`).
 
-2. Build:
-```bash
-corepack pnpm build
-```
-
-3. Run DB migrations (before API startup):
-```bash
-corepack pnpm db:migrate
-```
-
-4. Start services in order:
-1. API
-2. Worker
-3. Scheduler
-4. Frontend
+Compose stack file:
+- `docker-compose.deploy.yml`
 
 ## Zero-Downtime Notes
 
@@ -100,20 +94,16 @@ Configure these in both `staging` and `production` environments:
 - `SSH_KNOWN_HOSTS` (optional but recommended; if omitted, workflow uses `ssh-keyscan`)
 - `DEPLOY_PATH` (e.g. `/opt/nms-system`)
 - `DEPLOY_ENV_FILE_PATH` (absolute path to server `.env`, e.g. `/opt/nms-system/shared/.env`)
-- `SERVICE_API` (systemd service, e.g. `nms-api.service`)
-- `SERVICE_WORKER` (systemd service, e.g. `nms-worker.service`)
-- `SERVICE_SCHEDULER` (systemd service, e.g. `nms-scheduler.service`)
-- `SERVICE_WEB` (optional, e.g. `nginx.service` if web is served by Nginx)
+- `COMPOSE_PROJECT_NAME` (optional, default `nms`)
 - `HEALTHCHECK_URL` (optional, e.g. `https://nms.example.com/api/health`)
 - `RELEASES_TO_KEEP` (optional, default `5`)
 
 ### Server Prerequisites
 
 On target server:
-- Node.js 22+ installed
-- Corepack available and enabled
-- `pnpm` available through Corepack
-- `sudo systemctl restart ...` allowed for deploy user (prefer NOPASSWD for listed services only)
+- Docker Engine installed
+- Docker Compose plugin installed (`docker compose`)
+- deploy user allowed to run Docker commands
 - existing environment file at `DEPLOY_ENV_FILE_PATH`
 
 Release layout created by CD:

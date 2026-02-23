@@ -73,7 +73,7 @@ jobs:
         run: pnpm install --frozen-lockfile
 
       - name: Generate Prisma client
-        run: pnpm --filter @nms/db exec prisma generate
+        run: pnpm db:generate
 
       - name: Lint
         run: pnpm lint
@@ -116,10 +116,7 @@ jobs:
       SSH_KNOWN_HOSTS: ${{ secrets.SSH_KNOWN_HOSTS }}
       DEPLOY_PATH: ${{ secrets.DEPLOY_PATH }}
       DEPLOY_ENV_FILE_PATH: ${{ secrets.DEPLOY_ENV_FILE_PATH }}
-      SERVICE_API: ${{ secrets.SERVICE_API }}
-      SERVICE_WORKER: ${{ secrets.SERVICE_WORKER }}
-      SERVICE_SCHEDULER: ${{ secrets.SERVICE_SCHEDULER }}
-      SERVICE_WEB: ${{ secrets.SERVICE_WEB }}
+      COMPOSE_PROJECT_NAME: ${{ secrets.COMPOSE_PROJECT_NAME }}
       HEALTHCHECK_URL: ${{ secrets.HEALTHCHECK_URL }}
       RELEASES_TO_KEEP: ${{ secrets.RELEASES_TO_KEEP }}
     steps:
@@ -143,9 +140,6 @@ jobs:
           : "${SSH_USER:?Missing SSH_USER secret}"
           : "${SSH_PRIVATE_KEY:?Missing SSH_PRIVATE_KEY secret}"
           : "${DEPLOY_PATH:?Missing DEPLOY_PATH secret}"
-          : "${SERVICE_API:?Missing SERVICE_API secret}"
-          : "${SERVICE_WORKER:?Missing SERVICE_WORKER secret}"
-          : "${SERVICE_SCHEDULER:?Missing SERVICE_SCHEDULER secret}"
 
       - name: Configure SSH client
         shell: bash
@@ -193,10 +187,7 @@ jobs:
 
           DEPLOY_PATH_Q="$(quote "${DEPLOY_PATH}")"
           DEPLOY_ENV_FILE_PATH_Q="$(quote "${DEPLOY_ENV_FILE_PATH}")"
-          SERVICE_API_Q="$(quote "${SERVICE_API}")"
-          SERVICE_WORKER_Q="$(quote "${SERVICE_WORKER}")"
-          SERVICE_SCHEDULER_Q="$(quote "${SERVICE_SCHEDULER}")"
-          SERVICE_WEB_Q="$(quote "${SERVICE_WEB}")"
+          COMPOSE_PROJECT_NAME_Q="$(quote "${COMPOSE_PROJECT_NAME}")"
           HEALTHCHECK_URL_Q="$(quote "${HEALTHCHECK_URL}")"
           RELEASES_TO_KEEP_Q="$(quote "${RELEASES_TO_KEEP}")"
           REMOTE_SCRIPT_Q="$(quote "${REMOTE_SCRIPT}")"
@@ -206,10 +197,7 @@ jobs:
           ssh -p "${SSH_PORT}" "${SSH_USER}@${SSH_HOST}" \
             "DEPLOY_PATH=${DEPLOY_PATH_Q} \
              DEPLOY_ENV_FILE_PATH=${DEPLOY_ENV_FILE_PATH_Q} \
-             SERVICE_API=${SERVICE_API_Q} \
-             SERVICE_WORKER=${SERVICE_WORKER_Q} \
-             SERVICE_SCHEDULER=${SERVICE_SCHEDULER_Q} \
-             SERVICE_WEB=${SERVICE_WEB_Q} \
+             COMPOSE_PROJECT_NAME=${COMPOSE_PROJECT_NAME_Q} \
              HEALTHCHECK_URL=${HEALTHCHECK_URL_Q} \
              RELEASES_TO_KEEP=${RELEASES_TO_KEEP_Q} \
              bash ${REMOTE_SCRIPT_Q} ${REMOTE_ARCHIVE_Q} ${RELEASE_ID_Q}"

@@ -10,79 +10,28 @@ RELEASE_ARCHIVE="$1"
 RELEASE_ID="$2"
 
 : "${DEPLOY_PATH:?DEPLOY_PATH is required}"
-: "${SERVICE_API:?SERVICE_API is required}"
-: "${SERVICE_WORKER:?SERVICE_WORKER is required}"
-: "${SERVICE_SCHEDULER:?SERVICE_SCHEDULER is required}"
 
 DEPLOY_PATH="${DEPLOY_PATH%/}"
 RELEASES_DIR="${DEPLOY_PATH}/releases"
 CURRENT_LINK="${DEPLOY_PATH}/current"
 RELEASES_TO_KEEP="${RELEASES_TO_KEEP:-5}"
 RELEASE_DIR="${RELEASES_DIR}/${RELEASE_ID}"
+COMPOSE_PROJECT_NAME="${COMPOSE_PROJECT_NAME:-nms}"
 
 if [[ ! -f "${RELEASE_ARCHIVE}" ]]; then
   echo "Release archive not found: ${RELEASE_ARCHIVE}" >&2
   exit 1
 fi
 
-if ! command -v node >/dev/null 2>&1; then
-  echo "Node.js is required on the server." >&2
+if ! command -v docker >/dev/null 2>&1; then
+  echo "Docker is required on the server." >&2
   exit 1
 fi
 
-if ! command -v corepack >/dev/null 2>&1; then
-  echo "Corepack is required on the server." >&2
+if ! docker compose version >/dev/null 2>&1; then
+  echo "Docker Compose plugin is required on the server." >&2
   exit 1
 fi
-
-if ! command -v systemctl >/dev/null 2>&1; then
-  echo "systemctl is required on the server." >&2
-  exit 1
-fi
-
-load_dotenv_file() {
-  local env_file="$1"
-
-  while IFS= read -r raw_line || [[ -n "${raw_line}" ]]; do
-    local line="${raw_line%$'\r'}"
-
-    # Trim leading whitespace.
-    line="${line#"${line%%[![:space:]]*}"}"
-    [[ -z "${line}" ]] && continue
-    [[ "${line:0:1}" == "#" ]] && continue
-
-    if [[ "${line}" == export\ * ]]; then
-      line="${line#export }"
-    fi
-
-    if [[ "${line}" != *=* ]]; then
-      continue
-    fi
-
-    local key="${line%%=*}"
-    local value="${line#*=}"
-
-    # Trim key whitespace.
-    key="${key%"${key##*[![:space:]]}"}"
-    key="${key#"${key%%[![:space:]]*}"}"
-
-    if [[ ! "${key}" =~ ^[A-Za-z_][A-Za-z0-9_]*$ ]]; then
-      echo "Invalid env variable name in ${env_file}: ${key}" >&2
-      exit 1
-    fi
-
-    # Drop matching outer quotes if present.
-    if [[ ${#value} -ge 2 ]]; then
-      if [[ "${value}" == \"*\" && "${value}" == *\" ]]; then
-        value="${value:1:${#value}-2}"
-      elif [[ "${value}" == \'*\' && "${value}" == *\' ]]; then
-        value="${value:1:${#value}-2}"
-      fi
-    fi
-
-    export "${key}=${value}"
-  done < "${env_file}"
-}
 
 mkdir -p "${RELEASES_DIR}"
 rm -rf "${RELEASE_DIR}"
@@ -98,41 +47,27 @@ if [[ ! -f "${ENV_FILE_PATH}" ]]; then
   exit 1
 fi
 
+COMPOSE_FILE_PATH="${RELEASE_DIR}/docker-compose.deploy.yml"
+if [[ ! -f "${COMPOSE_FILE_PATH}" ]]; then
+  echo "Missing compose file: ${COMPOSE_FILE_PATH}" >&2
+  exit 1
+fi
+
 ln -sfn "${ENV_FILE_PATH}" "${RELEASE_DIR}/.env"
-
-cd "${RELEASE_DIR}"
-corepack enable
-# Export release env vars for prisma config and build-time tooling.
-load_dotenv_file "${RELEASE_DIR}/.env"
-: "${DATABASE_URL:?DATABASE_URL must be set in deployment env file}"
-
-pnpm install --frozen-lockfile
-pnpm db:generate
-pnpm build
-pnpm db:migrate
-
 ln -sfn "${RELEASE_DIR}" "${CURRENT_LINK}"
-cd "${CURRENT_LINK}"
 
-restart_service() {
-  local service_name="$1"
-  if [[ -z "${service_name}" ]]; then
-    return 0
-  fi
-
-  local systemctl_cmd=("systemctl")
-  if command -v sudo >/dev/null 2>&1; then
-    systemctl_cmd=("sudo" "systemctl")
-  fi
-
-  "${systemctl_cmd[@]}" restart "${service_name}"
-  "${systemctl_cmd[@]}" is-active --quiet "${service_name}"
+compose() {
+  IMAGE_TAG="${RELEASE_ID}" docker compose \
+    --project-name "${COMPOSE_PROJECT_NAME}" \
+    --env-file "${RELEASE_DIR}/.env" \
+    -f "${COMPOSE_FILE_PATH}" "$@"
 }
 
-restart_service "${SERVICE_API}"
-restart_service "${SERVICE_WORKER}"
-restart_service "${SERVICE_SCHEDULER}"
-restart_service "${SERVICE_WEB:-}"
+compose build api web
+compose up -d --remove-orphans postgres redis mailhog
+compose run --rm migrate
+compose up -d --remove-orphans api worker scheduler web
+compose ps
 
 if [[ -n "${HEALTHCHECK_URL:-}" ]]; then
   curl --fail --silent --show-error --max-time 10 --retry 12 --retry-delay 5 "${HEALTHCHECK_URL}" >/dev/null
