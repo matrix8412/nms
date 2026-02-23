@@ -97,6 +97,7 @@ Configure these in both `staging` and `production` environments:
 - `COMPOSE_PROJECT_NAME` (optional, default `nms`)
 - `HEALTHCHECK_URL` (optional, e.g. `https://nms.example.com/api/health`)
 - `RELEASES_TO_KEEP` (optional, default `5`)
+- `AUTO_RESET_DB_ON_P3009` (optional, default auto `true` for staging/dev, `false` for production; destructive reset of `public` schema only for failed initial migration recovery)
 
 ### Server Prerequisites
 

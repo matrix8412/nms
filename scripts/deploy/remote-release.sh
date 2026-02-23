@@ -17,6 +17,7 @@ CURRENT_LINK="${DEPLOY_PATH}/current"
 RELEASES_TO_KEEP="${RELEASES_TO_KEEP:-5}"
 RELEASE_DIR="${RELEASES_DIR}/${RELEASE_ID}"
 COMPOSE_PROJECT_NAME="${COMPOSE_PROJECT_NAME:-nms}"
+AUTO_RESET_DB_ON_P3009="${AUTO_RESET_DB_ON_P3009:-false}"
 
 if [[ ! -f "${RELEASE_ARCHIVE}" ]]; then
   echo "Release archive not found: ${RELEASE_ARCHIVE}" >&2
@@ -82,7 +83,35 @@ compose() {
 
 compose build api web
 compose up -d --remove-orphans postgres redis mailhog
-compose run --rm migrate
+
+run_migrations() {
+  local migrate_output
+  local migrate_status
+
+  set +e
+  migrate_output="$(compose run --rm migrate 2>&1)"
+  migrate_status=$?
+  set -e
+  printf '%s\n' "${migrate_output}"
+
+  if [[ ${migrate_status} -eq 0 ]]; then
+    return 0
+  fi
+
+  if [[ "${AUTO_RESET_DB_ON_P3009}" == "true" ]] \
+    && [[ "${migrate_output}" == *"Error: P3009"* ]] \
+    && [[ "${migrate_output}" == *"202602190001_init"* ]]; then
+    echo "Detected failed initial migration state (P3009). Resetting public schema and retrying once..."
+    compose exec -T postgres psql -U "${POSTGRES_USER:-nms}" -d "${POSTGRES_DB:-nms}" \
+      -c 'DROP SCHEMA IF EXISTS public CASCADE; CREATE SCHEMA public;'
+    compose run --rm migrate
+    return 0
+  fi
+
+  return "${migrate_status}"
+}
+
+run_migrations
 compose up -d --remove-orphans api worker scheduler web
 compose ps
 

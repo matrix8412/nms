@@ -119,6 +119,7 @@ jobs:
       COMPOSE_PROJECT_NAME: ${{ secrets.COMPOSE_PROJECT_NAME }}
       HEALTHCHECK_URL: ${{ secrets.HEALTHCHECK_URL }}
       RELEASES_TO_KEEP: ${{ secrets.RELEASES_TO_KEEP }}
+      AUTO_RESET_DB_ON_P3009: ${{ github.event_name == 'workflow_dispatch' && (inputs.target == 'staging' && 'true' || 'false') || (github.ref_name == 'dev' && 'true' || 'false') }}
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -198,6 +199,7 @@ jobs:
           COMPOSE_PROJECT_NAME_Q="$(quote "${COMPOSE_PROJECT_NAME}")"
           HEALTHCHECK_URL_Q="$(quote "${HEALTHCHECK_URL}")"
           RELEASES_TO_KEEP_Q="$(quote "${RELEASES_TO_KEEP}")"
+          AUTO_RESET_DB_ON_P3009_Q="$(quote "${AUTO_RESET_DB_ON_P3009}")"
           REMOTE_SCRIPT_Q="$(quote "${REMOTE_SCRIPT}")"
           REMOTE_ARCHIVE_Q="$(quote "${REMOTE_ARCHIVE}")"
           RELEASE_ID_Q="$(quote "${RELEASE_ID}")"
@@ -208,4 +210,5 @@ jobs:
              COMPOSE_PROJECT_NAME=${COMPOSE_PROJECT_NAME_Q} \
              HEALTHCHECK_URL=${HEALTHCHECK_URL_Q} \
              RELEASES_TO_KEEP=${RELEASES_TO_KEEP_Q} \
+             AUTO_RESET_DB_ON_P3009=${AUTO_RESET_DB_ON_P3009_Q} \
              bash ${REMOTE_SCRIPT_Q} ${REMOTE_ARCHIVE_Q} ${RELEASE_ID_Q}"
