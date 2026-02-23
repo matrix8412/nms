@@ -11,9 +11,6 @@
       "default": "./dist/client.js"
     }
   },
-  "prisma": {
-    "schema": "prisma/schema.prisma"
-  },
   "scripts": {
     "build": "tsup src/client.ts --format esm,cjs --dts",
     "dev": "tsup src/client.ts --format esm,cjs --dts --watch",
