@@ -11,7 +11,7 @@ COPY . .
 
 RUN pnpm install --frozen-lockfile
 RUN pnpm --filter @nms/shared build
-RUN pnpm --filter @nms/web run build -- --configuration production
+RUN pnpm --filter @nms/web exec ng build --configuration production
 
 FROM nginx:1.27-alpine AS runtime
 
