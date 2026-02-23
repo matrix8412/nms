@@ -10,6 +10,9 @@ RUN corepack enable
 
 FROM base AS build
 
+ARG DATABASE_URL=postgresql://nms:nms@localhost:5432/nms?schema=public
+ENV DATABASE_URL="${DATABASE_URL}"
+
 COPY . .
 
 RUN pnpm install --frozen-lockfile
