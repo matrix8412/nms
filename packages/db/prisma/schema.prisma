@@ -148,7 +148,7 @@ model AuditLog {
 }
 
 model DeviceMetric {
-  id           BigInt   @id @default(autoincrement())
+  id           BigInt   @default(autoincrement())
   deviceId     String
   source       String
   itemKey      String
@@ -159,6 +159,7 @@ model DeviceMetric {
   metadata     Json?
   device       Device   @relation(fields: [deviceId], references: [id], onDelete: Cascade)
 
+  @@id([id, recordedAt])
   @@index([deviceId, recordedAt(sort: Desc)])
   @@index([itemKey, recordedAt(sort: Desc)])
 }

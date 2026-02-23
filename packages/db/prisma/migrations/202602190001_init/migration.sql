@@ -116,7 +116,7 @@ CREATE TABLE "DeviceMetric" (
   "valueText" TEXT,
   "recordedAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
   "metadata" JSONB,
-  CONSTRAINT "DeviceMetric_pkey" PRIMARY KEY ("id")
+  CONSTRAINT "DeviceMetric_pkey" PRIMARY KEY ("id", "recordedAt")
 );
 
 CREATE TABLE "ZabbixItemMapping" (
