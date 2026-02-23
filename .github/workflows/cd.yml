@@ -115,7 +115,7 @@ jobs:
       SSH_PRIVATE_KEY: ${{ secrets.SSH_PRIVATE_KEY }}
       SSH_KNOWN_HOSTS: ${{ secrets.SSH_KNOWN_HOSTS }}
       DEPLOY_PATH: ${{ secrets.DEPLOY_PATH }}
-      DEPLOY_ENV_FILE_PATH: ${{ secrets.DEPLOY_ENV_FILE_PATH }}
+      DEPLOY_ENV_FILE_CONTENT: ${{ secrets.DEPLOY_ENV_FILE_CONTENT }}
       COMPOSE_PROJECT_NAME: ${{ secrets.COMPOSE_PROJECT_NAME }}
       HEALTHCHECK_URL: ${{ secrets.HEALTHCHECK_URL }}
       RELEASES_TO_KEEP: ${{ secrets.RELEASES_TO_KEEP }}
@@ -140,6 +140,7 @@ jobs:
           : "${SSH_USER:?Missing SSH_USER secret}"
           : "${SSH_PRIVATE_KEY:?Missing SSH_PRIVATE_KEY secret}"
           : "${DEPLOY_PATH:?Missing DEPLOY_PATH secret}"
+          : "${DEPLOY_ENV_FILE_CONTENT:?Missing DEPLOY_ENV_FILE_CONTENT secret}"
 
       - name: Configure SSH client
         shell: bash
@@ -166,13 +167,20 @@ jobs:
           RELEASE_ID="${COMMIT_SHA:0:12}-${GITHUB_RUN_NUMBER}-${GITHUB_RUN_ATTEMPT}"
           REMOTE_ARCHIVE="/tmp/nms-release-${RELEASE_ID}.tar.gz"
           REMOTE_SCRIPT="/tmp/nms-remote-release-${RELEASE_ID}.sh"
+          REMOTE_ENV_FILE="/tmp/nms-env-${RELEASE_ID}.env"
+          LOCAL_ENV_FILE="$(mktemp)"
 
           echo "RELEASE_ID=${RELEASE_ID}" >> "${GITHUB_ENV}"
           echo "REMOTE_ARCHIVE=${REMOTE_ARCHIVE}" >> "${GITHUB_ENV}"
           echo "REMOTE_SCRIPT=${REMOTE_SCRIPT}" >> "${GITHUB_ENV}"
+          echo "REMOTE_ENV_FILE=${REMOTE_ENV_FILE}" >> "${GITHUB_ENV}"
 
+          chmod 600 "${LOCAL_ENV_FILE}"
+          printf "%s" "${DEPLOY_ENV_FILE_CONTENT}" > "${LOCAL_ENV_FILE}"
           scp -P "${SSH_PORT}" ./release.tar.gz "${SSH_USER}@${SSH_HOST}:${REMOTE_ARCHIVE}"
           scp -P "${SSH_PORT}" ./scripts/deploy/remote-release.sh "${SSH_USER}@${SSH_HOST}:${REMOTE_SCRIPT}"
+          scp -P "${SSH_PORT}" "${LOCAL_ENV_FILE}" "${SSH_USER}@${SSH_HOST}:${REMOTE_ENV_FILE}"
+          rm -f "${LOCAL_ENV_FILE}"
 
       - name: Execute remote deployment
         shell: bash
@@ -186,7 +194,7 @@ jobs:
           }
 
           DEPLOY_PATH_Q="$(quote "${DEPLOY_PATH}")"
-          DEPLOY_ENV_FILE_PATH_Q="$(quote "${DEPLOY_ENV_FILE_PATH}")"
+          DEPLOY_ENV_FILE_PATH_Q="$(quote "${REMOTE_ENV_FILE}")"
           COMPOSE_PROJECT_NAME_Q="$(quote "${COMPOSE_PROJECT_NAME}")"
           HEALTHCHECK_URL_Q="$(quote "${HEALTHCHECK_URL}")"
           RELEASES_TO_KEEP_Q="$(quote "${RELEASES_TO_KEEP}")"

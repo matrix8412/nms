@@ -93,7 +93,7 @@ Configure these in both `staging` and `production` environments:
 - `SSH_PRIVATE_KEY` (private key for `SSH_USER`)
 - `SSH_KNOWN_HOSTS` (optional but recommended; if omitted, workflow uses `ssh-keyscan`)
 - `DEPLOY_PATH` (e.g. `/opt/nms-system`)
-- `DEPLOY_ENV_FILE_PATH` (absolute path to server `.env`, e.g. `/opt/nms-system/shared/.env`)
+- `DEPLOY_ENV_FILE_CONTENT` (full `.env` file content, multi-line secret)
 - `COMPOSE_PROJECT_NAME` (optional, default `nms`)
 - `HEALTHCHECK_URL` (optional, e.g. `https://nms.example.com/api/health`)
 - `RELEASES_TO_KEEP` (optional, default `5`)
@@ -104,7 +104,6 @@ On target server:
 - Docker Engine installed
 - Docker Compose plugin installed (`docker compose`)
 - deploy user allowed to run Docker commands (docker group) or passwordless `sudo docker`
-- existing environment file at `DEPLOY_ENV_FILE_PATH`
 
 Release layout created by CD:
 - `${DEPLOY_PATH}/releases/<release_id>` - immutable release directory

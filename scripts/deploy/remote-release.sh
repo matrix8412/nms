@@ -54,7 +54,7 @@ rm -f "${RELEASE_ARCHIVE}"
 ENV_FILE_PATH="${DEPLOY_ENV_FILE_PATH:-${DEPLOY_PATH}/shared/.env}"
 if [[ ! -f "${ENV_FILE_PATH}" ]]; then
   echo "Deployment env file does not exist: ${ENV_FILE_PATH}" >&2
-  echo "Set DEPLOY_ENV_FILE_PATH secret or create ${DEPLOY_PATH}/shared/.env on the server." >&2
+  echo "Provide DEPLOY_ENV_FILE_PATH or upload env file before deployment." >&2
   exit 1
 fi
 
@@ -64,7 +64,13 @@ if [[ ! -f "${COMPOSE_FILE_PATH}" ]]; then
   exit 1
 fi
 
-ln -sfn "${ENV_FILE_PATH}" "${RELEASE_DIR}/.env"
+cp "${ENV_FILE_PATH}" "${RELEASE_DIR}/.env"
+chmod 600 "${RELEASE_DIR}/.env"
+
+if [[ "${ENV_FILE_PATH}" == /tmp/nms-env-* ]]; then
+  rm -f "${ENV_FILE_PATH}"
+fi
+
 ln -sfn "${RELEASE_DIR}" "${CURRENT_LINK}"
 
 compose() {
