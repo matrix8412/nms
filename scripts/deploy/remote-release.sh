@@ -47,20 +47,28 @@ mkdir -p "${RELEASE_DIR}"
 tar -xzf "${RELEASE_ARCHIVE}" -C "${RELEASE_DIR}"
 rm -f "${RELEASE_ARCHIVE}"
 
-if [[ -n "${DEPLOY_ENV_FILE_PATH:-}" ]]; then
-  if [[ ! -f "${DEPLOY_ENV_FILE_PATH}" ]]; then
-    echo "DEPLOY_ENV_FILE_PATH does not exist: ${DEPLOY_ENV_FILE_PATH}" >&2
-    exit 1
-  fi
-  ln -sfn "${DEPLOY_ENV_FILE_PATH}" "${RELEASE_DIR}/.env"
+ENV_FILE_PATH="${DEPLOY_ENV_FILE_PATH:-${DEPLOY_PATH}/shared/.env}"
+if [[ ! -f "${ENV_FILE_PATH}" ]]; then
+  echo "Deployment env file does not exist: ${ENV_FILE_PATH}" >&2
+  echo "Set DEPLOY_ENV_FILE_PATH secret or create ${DEPLOY_PATH}/shared/.env on the server." >&2
+  exit 1
 fi
+
+ln -sfn "${ENV_FILE_PATH}" "${RELEASE_DIR}/.env"
 
 cd "${RELEASE_DIR}"
 corepack enable
+# Export release env vars for prisma config and build-time tooling.
+set -a
+# shellcheck disable=SC1090
+source "${RELEASE_DIR}/.env"
+set +a
+: "${DATABASE_URL:?DATABASE_URL must be set in deployment env file}"
+
 pnpm install --frozen-lockfile
-pnpm --filter @nms/db exec prisma generate
+pnpm db:generate
 pnpm build
-pnpm --filter @nms/db exec prisma migrate deploy
+pnpm db:migrate
 
 ln -sfn "${RELEASE_DIR}" "${CURRENT_LINK}"
 cd "${CURRENT_LINK}"
