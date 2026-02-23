@@ -14,8 +14,8 @@ COPY . .
 
 RUN pnpm install --frozen-lockfile
 RUN pnpm --filter @nms/shared build
-RUN pnpm --filter @nms/db build
 RUN pnpm db:generate
+RUN pnpm --filter @nms/db build
 RUN pnpm --filter @nms/api build
 RUN pnpm --filter @nms/worker build
 RUN pnpm --filter @nms/scheduler build
