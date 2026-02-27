@@ -177,3 +177,53 @@ model ZabbixItemMapping {
   @@index([vendor, deviceType])
   @@unique([vendor, deviceType, itemKey])
 }
+
+// ── Catalog: Vendors & Device Types ─────────────────────────
+
+model Vendor {
+  id        String   @id @default(cuid())
+  name      String   @unique
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model DeviceType {
+  id        String   @id @default(cuid())
+  name      String   @unique
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+// ── Integration Settings ────────────────────────────────────
+
+model IntegrationConfig {
+  id           String   @id @default(cuid())
+  provider     String   @unique          // e.g. "zabbix"
+  enabled      Boolean  @default(false)
+  settings     Json     @default("{}")   // provider-specific JSON blob
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+}
+
+// ── Role-based permissions ──────────────────────────────────
+
+model Role {
+  id          String           @id @default(cuid())
+  name        String           @unique
+  description String?
+  builtIn     Boolean          @default(false)
+  createdAt   DateTime         @default(now())
+  updatedAt   DateTime         @updatedAt
+  permissions RolePermission[]
+}
+
+model RolePermission {
+  id       String @id @default(cuid())
+  roleId   String
+  resource String              // e.g. "hosts", "users", "settings"
+  action   String              // e.g. "read", "create", "update", "delete"
+  role     Role   @relation(fields: [roleId], references: [id], onDelete: Cascade)
+
+  @@unique([roleId, resource, action])
+  @@index([roleId])
+}

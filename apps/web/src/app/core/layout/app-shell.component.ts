@@ -376,20 +376,24 @@ export class AppShellComponent {
       icon: 'dns',
       children: [
         { label: 'All Hosts', route: '/hosts', icon: 'list' },
-        { label: 'Add Host', route: '/hosts/new', icon: 'add_circle_outline' },
+        { label: 'Host Groups', route: '/hosts/groups', icon: 'folder' },
       ],
     },
     { label: 'Events', icon: 'event_note', route: '/events' },
-    { label: 'Audit Logs', icon: 'history', route: '/audit-logs' },
     {
-      label: 'Users',
-      icon: 'people',
+      label: 'Settings',
+      icon: 'settings',
       adminOnly: true,
       children: [
-        { label: 'All Users', route: '/users', icon: 'list' },
+        { label: 'General', route: '/settings', icon: 'tune' },
+        { label: 'Users', route: '/settings/users', icon: 'people' },
+        { label: 'Audit Logs', route: '/settings/audit-logs', icon: 'history' },
+        { label: 'Roles', route: '/settings/roles', icon: 'admin_panel_settings' },
+        { label: 'Integrations', route: '/settings/integrations', icon: 'extension' },
+        { label: 'Plugins', route: '/settings/plugins', icon: 'power' },
+        { label: 'Catalogs', route: '/settings/catalogs', icon: 'inventory_2' },
       ],
     },
-    { label: 'Settings', icon: 'settings', route: '/settings', adminOnly: true },
   ];
 
   protected readonly visibleNav = computed(() => {

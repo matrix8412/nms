@@ -50,8 +50,21 @@ export class ApiService {
     return this.http.get<{ data: GroupDto[] }>('/api/groups');
   }
 
+  // ── Device Groups (Host Groups) ──────────────────────────
   getDeviceGroups() {
     return this.http.get<{ data: unknown[] }>('/api/device-groups');
+  }
+
+  createDeviceGroup(payload: { name: string; description?: string | null }) {
+    return this.http.post<{ data: unknown }>('/api/device-groups', payload);
+  }
+
+  updateDeviceGroup(id: string, payload: { name?: string; description?: string | null }) {
+    return this.http.patch<{ data: unknown }>(`/api/device-groups/${id}`, payload);
+  }
+
+  deleteDeviceGroup(id: string) {
+    return this.http.delete<{ ok: boolean }>(`/api/device-groups/${id}`);
   }
 
   // ── Admin Users ──────────────────────────────────────────
@@ -79,6 +92,70 @@ export class ApiService {
       page: number;
       totalPages: number;
     }>('/api/audit-logs', { params: { page: page.toString(), limit: limit.toString() } });
+  }
+
+  // ── Vendors (Catalog) ────────────────────────────────────
+  getVendors() {
+    return this.http.get<{ data: unknown[] }>('/api/catalog/vendors');
+  }
+
+  createVendor(payload: { name: string }) {
+    return this.http.post<{ data: unknown }>('/api/catalog/vendors', payload);
+  }
+
+  updateVendor(id: string, payload: { name: string }) {
+    return this.http.patch<{ data: unknown }>(`/api/catalog/vendors/${id}`, payload);
+  }
+
+  deleteVendor(id: string) {
+    return this.http.delete<{ ok: boolean }>(`/api/catalog/vendors/${id}`);
+  }
+
+  // ── Device Types (Catalog) ───────────────────────────────
+  getDeviceTypes() {
+    return this.http.get<{ data: unknown[] }>('/api/catalog/device-types');
+  }
+
+  createDeviceType(payload: { name: string }) {
+    return this.http.post<{ data: unknown }>('/api/catalog/device-types', payload);
+  }
+
+  updateDeviceType(id: string, payload: { name: string }) {
+    return this.http.patch<{ data: unknown }>(`/api/catalog/device-types/${id}`, payload);
+  }
+
+  deleteDeviceType(id: string) {
+    return this.http.delete<{ ok: boolean }>(`/api/catalog/device-types/${id}`);
+  }
+
+  // ── Integrations ─────────────────────────────────────────
+  getIntegrations() {
+    return this.http.get<{ data: unknown[] }>('/api/integrations');
+  }
+
+  getIntegration(provider: string) {
+    return this.http.get<{ data: unknown }>(`/api/integrations/${provider}`);
+  }
+
+  updateIntegration(provider: string, payload: { enabled?: boolean; settings?: Record<string, unknown> }) {
+    return this.http.put<{ data: unknown }>(`/api/integrations/${provider}`, payload);
+  }
+
+  // ── Roles ────────────────────────────────────────────────
+  getRoles() {
+    return this.http.get<{ data: unknown[] }>('/api/roles');
+  }
+
+  createRole(payload: { name: string; description?: string | null; permissions: { resource: string; action: string }[] }) {
+    return this.http.post<{ data: unknown }>('/api/roles', payload);
+  }
+
+  updateRole(id: string, payload: { name?: string; description?: string | null; permissions?: { resource: string; action: string }[] }) {
+    return this.http.patch<{ data: unknown }>(`/api/roles/${id}`, payload);
+  }
+
+  deleteRole(id: string) {
+    return this.http.delete<{ ok: boolean }>(`/api/roles/${id}`);
   }
 
   // ── Zabbix ───────────────────────────────────────────────
