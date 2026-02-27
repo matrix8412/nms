@@ -127,8 +127,8 @@ if [[ "${RELEASES_TO_KEEP}" =~ ^[0-9]+$ ]] && [[ "${RELEASES_TO_KEEP}" -ge 1 ]];
 fi
 
 echo "Pruning unused Docker resources..."
-"${DOCKER_CMD[@]}" image prune -af --filter "until=1h" 2>/dev/null || true
-"${DOCKER_CMD[@]}" builder prune -af --keep-storage=2gb 2>/dev/null || true
-"${DOCKER_CMD[@]}" volume prune -f 2>/dev/null || true
+"${DOCKER_CMD[@]}" image prune -af --filter "until=1h" || echo "  ⚠ image prune failed (non-critical)"
+"${DOCKER_CMD[@]}" builder prune -af --keep-storage=2gb || echo "  ⚠ builder prune failed (non-critical)"
+"${DOCKER_CMD[@]}" volume prune -f || echo "  ⚠ volume prune failed (non-critical)"
 
 echo "Deployment finished: ${RELEASE_DIR}"
