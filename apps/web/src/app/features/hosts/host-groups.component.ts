@@ -69,9 +69,9 @@ interface DeviceGroup {
 
     <!-- Create / Edit panel -->
     <app-slide-panel
-      [open]="panelOpen()"
+      [isOpen]="panelOpen()"
       [title]="editing() ? 'Edit Group' : 'New Group'"
-      (closed)="panelOpen.set(false)"
+      (close)="panelOpen.set(false)"
     >
       <form (ngSubmit)="save()" class="panel-form">
         <label class="form-label">

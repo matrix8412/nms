@@ -29,7 +29,7 @@ export async function PATCH(request: NextRequest, { params }: Params) {
       const existing = await tx.role.findUnique({ where: { id } });
       if (!existing) throw new ApiError(404, 'NOT_FOUND', 'Role not found');
 
-      const updated = await tx.role.update({
+      await tx.role.update({
         where: { id },
         data: {
           ...(body.name !== undefined && { name: body.name }),

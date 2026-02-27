@@ -66,9 +66,9 @@ const MODULES: ModuleDef[] = [
 
     <!-- Config panel -->
     <app-slide-panel
-      [open]="panelOpen()"
+      [isOpen]="panelOpen()"
       [title]="editingModule()?.label + ' Configuration'"
-      (closed)="panelOpen.set(false)"
+      (close)="panelOpen.set(false)"
     >
       <form *ngIf="editingModule() as m" (ngSubmit)="saveConfig()" class="panel-form">
         <label class="form-label toggle-row">

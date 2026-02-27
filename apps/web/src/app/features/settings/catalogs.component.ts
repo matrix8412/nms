@@ -73,9 +73,9 @@ interface CatalogItem { id: string; name: string; createdAt: string; }
 
     <!-- Create/Edit panel -->
     <app-slide-panel
-      [open]="panelOpen()"
+      [isOpen]="panelOpen()"
       [title]="editingItem() ? 'Edit' : 'New ' + (activeTab() === 'vendors' ? 'Vendor' : 'Device Type')"
-      (closed)="panelOpen.set(false)"
+      (close)="panelOpen.set(false)"
     >
       <form (ngSubmit)="save()" class="panel-form">
         <label class="form-label">

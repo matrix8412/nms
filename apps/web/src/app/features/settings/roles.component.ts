@@ -71,9 +71,9 @@ const ACTIONS = ['read', 'create', 'update', 'delete'] as const;
 
     <!-- Create/Edit panel -->
     <app-slide-panel
-      [open]="panelOpen()"
+      [isOpen]="panelOpen()"
       [title]="editing() ? 'Edit Role' : 'New Role'"
-      (closed)="panelOpen.set(false)"
+      (close)="panelOpen.set(false)"
     >
       <form (ngSubmit)="save()" class="panel-form">
         <label class="form-label">
