@@ -240,11 +240,15 @@ export class RolesComponent implements OnInit {
   }
 
   protected save() {
-    const permissions = Array.from(this.formPermissions()).map((k) => {
-      const [resource, action] = k.split(':');
-      return { resource, action };
+    const permissions: { resource: string; action: string }[] = Array.from(this.formPermissions()).map((k) => {
+      const parts = k.split(':');
+      return { resource: parts[0]!, action: parts[1]! };
     });
-    const payload = { name: this.formName, description: this.formDesc || null, permissions };
+    const payload: { name: string; description?: string; permissions: { resource: string; action: string }[] } = {
+      name: this.formName,
+      ...(this.formDesc ? { description: this.formDesc } : {}),
+      permissions,
+    };
     const edit = this.editing();
 
     const req = edit
