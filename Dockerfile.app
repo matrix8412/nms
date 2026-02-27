@@ -27,6 +27,24 @@ FROM base AS runtime
 
 ENV NODE_ENV=production
 
-COPY --from=build /app /app
+# Copy workspace structure (package.json files, lockfile, configs)
+COPY --from=build /app/package.json /app/pnpm-lock.yaml /app/pnpm-workspace.yaml /app/turbo.json /app/tsconfig.base.json /app/
+COPY --from=build /app/.npmrc* /app/
+
+# Copy built packages
+COPY --from=build /app/packages /app/packages
+
+# Copy built apps
+COPY --from=build /app/apps/api /app/apps/api
+COPY --from=build /app/apps/worker /app/apps/worker
+COPY --from=build /app/apps/scheduler /app/apps/scheduler
+
+# Copy node_modules (workspace root + all packages)
+COPY --from=build /app/node_modules /app/node_modules
+
+# Copy scripts (needed for db:migrate)
+COPY --from=build /app/scripts /app/scripts
+
+EXPOSE 3000
 
 CMD ["corepack", "pnpm", "--filter", "@nms/api", "start"]

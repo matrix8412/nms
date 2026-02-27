@@ -1,6 +1,6 @@
 import { prisma } from '@nms/db';
-import { ZabbixClient } from './zabbix';
-import { env } from './env';
+import { ZabbixClient } from './zabbix.js';
+import { env } from './env.js';
 
 const DEFAULT_KEYS_BY_TYPE: Record<string, string[]> = {
   default: ['system.cpu.load[percpu,avg1]', 'vm.memory.size[available]', 'icmpping'],

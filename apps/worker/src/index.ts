@@ -1,8 +1,8 @@
 import { Worker } from 'bullmq';
 import pino from 'pino';
 import { DEVICE_COMMANDS_QUEUE, DEVICE_SYNC_QUEUE, type DeviceSyncJobPayload } from '@nms/shared';
-import { env } from './env';
-import { syncDevice } from './sync';
+import { env } from './env.js';
+import { syncDevice } from './sync.js';
 
 const logger = pino({ name: '@nms/worker' });
 
