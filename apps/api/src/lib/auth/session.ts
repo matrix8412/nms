@@ -1,7 +1,7 @@
 import { prisma } from '@nms/db';
 import { ApiError } from '@/lib/errors';
 import { createOpaqueToken, createSessionId, hashToken } from '@/lib/crypto';
-import { isProd } from '@/lib/env';
+import { isSecure } from '@/lib/env';
 import type { NextRequest, NextResponse } from 'next/server';
 import { CSRF_COOKIE, SESSION_COOKIE, SESSION_TTL_MS } from './constants';
 
@@ -66,7 +66,7 @@ export function setSessionCookies(
     name: SESSION_COOKIE,
     value: session.rawSessionToken,
     httpOnly: true,
-    secure: isProd,
+    secure: isSecure,
     sameSite: 'lax',
     path: '/',
     expires: session.expiresAt,
@@ -76,7 +76,7 @@ export function setSessionCookies(
     name: CSRF_COOKIE,
     value: session.csrfSecret,
     httpOnly: false,
-    secure: isProd,
+    secure: isSecure,
     sameSite: 'lax',
     path: '/',
     expires: session.expiresAt,

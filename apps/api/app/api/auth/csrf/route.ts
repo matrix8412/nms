@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
 import { CSRF_ANON_COOKIE } from '@/lib/auth/constants';
-import { isProd } from '@/lib/env';
+import { isSecure } from '@/lib/env';
 
 export async function GET(request: Request) {
   const token =
@@ -13,7 +13,7 @@ export async function GET(request: Request) {
     value: token,
     httpOnly: false,
     sameSite: 'lax',
-    secure: isProd,
+    secure: isSecure,
     path: '/',
   });
   return response;

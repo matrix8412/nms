@@ -20,3 +20,4 @@ const envSchema = z.object({
 export const env = envSchema.parse(process.env);
 
 export const isProd = env.NODE_ENV === 'production';
+export const isSecure = env.APP_URL.startsWith('https://');

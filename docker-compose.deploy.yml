@@ -100,7 +100,7 @@ services:
 
   migrate:
     image: nms-app:${IMAGE_TAG:-latest}
-    command: ["corepack", "pnpm", "db:migrate"]
+    command: ["sh", "-c", "corepack pnpm db:migrate && corepack pnpm db:seed"]
     env_file:
       - .env
     environment:
