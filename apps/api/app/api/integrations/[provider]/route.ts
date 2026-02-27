@@ -9,7 +9,7 @@ import type { NextRequest } from 'next/server';
 
 const upsertSchema = z.object({
   enabled: z.boolean().optional(),
-  settings: z.record(z.unknown()).optional(),
+  settings: z.record(z.string(), z.unknown()).optional(),
 });
 
 type Params = { params: Promise<{ provider: string }> };
