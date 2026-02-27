@@ -8,12 +8,12 @@ import { VerifyEmailPageComponent } from './features/auth/verify-email-page.comp
 import { RequestResetPageComponent } from './features/auth/request-reset-page.component';
 import { ResetPasswordPageComponent } from './features/auth/reset-password-page.component';
 import { UserDashboardComponent } from './features/dashboard/user-dashboard.component';
-import { DeviceListPageComponent } from './features/devices/device-list-page.component';
-import { DeviceDetailPageComponent } from './features/devices/device-detail-page.component';
-import { AdminDashboardComponent } from './features/admin/admin-dashboard.component';
-import { AdminUsersPageComponent } from './features/admin/admin-users-page.component';
-import { AdminGroupsPageComponent } from './features/admin/admin-groups-page.component';
-import { AdminDevicesPageComponent } from './features/admin/admin-devices-page.component';
+import { HostListComponent } from './features/hosts/host-list.component';
+import { HostDetailComponent } from './features/hosts/host-detail.component';
+import { EventsComponent } from './features/events/events.component';
+import { AuditLogsComponent } from './features/audit-logs/audit-logs.component';
+import { UsersComponent } from './features/users/users.component';
+import { SettingsComponent } from './features/settings/settings.component';
 
 export const routes: Routes = [
   { path: '', pathMatch: 'full', redirectTo: 'dashboard' },
@@ -43,12 +43,20 @@ export const routes: Routes = [
     canActivate: [authGuard],
     children: [
       { path: 'dashboard', component: UserDashboardComponent },
-      { path: 'devices', component: DeviceListPageComponent },
-      { path: 'devices/:id', component: DeviceDetailPageComponent },
-      { path: 'admin', component: AdminDashboardComponent, canActivate: [adminGuard] },
-      { path: 'admin/users', component: AdminUsersPageComponent, canActivate: [adminGuard] },
-      { path: 'admin/groups', component: AdminGroupsPageComponent, canActivate: [adminGuard] },
-      { path: 'admin/devices', component: AdminDevicesPageComponent, canActivate: [adminGuard] },
+      { path: 'hosts', component: HostListComponent },
+      { path: 'hosts/new', component: HostListComponent },
+      { path: 'hosts/:id', component: HostDetailComponent },
+      { path: 'events', component: EventsComponent },
+      { path: 'audit-logs', component: AuditLogsComponent },
+      { path: 'users', component: UsersComponent, canActivate: [adminGuard] },
+      { path: 'settings', component: SettingsComponent, canActivate: [adminGuard] },
+      // Legacy redirects
+      { path: 'devices', redirectTo: 'hosts', pathMatch: 'full' },
+      { path: 'devices/:id', redirectTo: 'hosts/:id' },
+      { path: 'admin', redirectTo: 'dashboard', pathMatch: 'full' },
+      { path: 'admin/users', redirectTo: 'users', pathMatch: 'full' },
+      { path: 'admin/groups', redirectTo: 'settings', pathMatch: 'full' },
+      { path: 'admin/devices', redirectTo: 'hosts', pathMatch: 'full' },
     ],
   },
   {
