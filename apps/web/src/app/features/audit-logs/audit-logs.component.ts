@@ -1,5 +1,5 @@
 import { CommonModule } from '@angular/common';
-import { Component, inject, OnInit, signal } from '@angular/core';
+import { Component, inject, OnInit, signal, computed } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { ApiService } from '../../core/http/api.service';
 
@@ -13,6 +13,9 @@ interface AuditEntry {
   meta: unknown;
 }
 
+type SortField = 'action' | 'userEmail' | 'ip' | 'createdAt';
+type SortDir = 'asc' | 'desc';
+
 @Component({
   selector: 'app-audit-logs',
   standalone: true,
@@ -25,45 +28,46 @@ interface AuditEntry {
       </div>
     </div>
 
-    <!-- Filters -->
-    <div class="filter-bar">
-      <div class="search-box">
-        <span class="material-icons search-icon">search</span>
-        <input
-          type="text"
-          placeholder="Filter by action..."
-          [(ngModel)]="actionFilter"
-          (ngModelChange)="applyFilter()"
-        />
-      </div>
-      <div class="filter-chips">
-        <button
-          class="chip"
-          [class.active]="actionFilter === ''"
-          (click)="actionFilter = ''; applyFilter()"
-        >All</button>
-        <button
-          *ngFor="let a of actionTypes()"
-          class="chip"
-          [class.active]="actionFilter === a"
-          (click)="actionFilter = a; applyFilter()"
-        >{{ a }}</button>
-      </div>
-    </div>
-
     <div class="table-card">
       <div class="table-wrap">
         <table>
           <thead>
             <tr>
-              <th>Action</th>
-              <th>User</th>
-              <th>IP Address</th>
-              <th>Timestamp</th>
+              <th class="sortable" (click)="toggleSort('action')">
+                Action
+                <span class="sort-icon material-icons">{{ getSortIcon('action') }}</span>
+              </th>
+              <th class="sortable" (click)="toggleSort('userEmail')">
+                User
+                <span class="sort-icon material-icons">{{ getSortIcon('userEmail') }}</span>
+              </th>
+              <th class="sortable" (click)="toggleSort('ip')">
+                IP Address
+                <span class="sort-icon material-icons">{{ getSortIcon('ip') }}</span>
+              </th>
+              <th class="sortable" (click)="toggleSort('createdAt')">
+                Timestamp
+                <span class="sort-icon material-icons">{{ getSortIcon('createdAt') }}</span>
+              </th>
+            </tr>
+            <tr class="filter-row">
+              <th>
+                <select class="th-filter" [(ngModel)]="actionFilter" (ngModelChange)="applyFilter()">
+                  <option value="">All</option>
+                  <option *ngFor="let a of actionTypes()" [value]="a">{{ a }}</option>
+                </select>
+              </th>
+              <th>
+                <input type="text" class="th-filter" placeholder="Search…" [(ngModel)]="userFilter" (ngModelChange)="applyFilter()" />
+              </th>
+              <th>
+                <input type="text" class="th-filter" placeholder="Search…" [(ngModel)]="ipFilter" (ngModelChange)="applyFilter()" />
+              </th>
+              <th></th>
             </tr>
           </thead>
           <tbody>
-            <tr *ngFor="let entry of filteredLogs()" class="row-hover">
+            <tr *ngFor="let entry of sortedLogs()" class="row-hover">
               <td>
                 <span class="badge" [ngClass]="getBadgeClass(entry.action)">{{ entry.action }}</span>
               </td>
@@ -71,7 +75,7 @@ interface AuditEntry {
               <td class="mono">{{ entry.ip || '—' }}</td>
               <td class="mono">{{ entry.createdAt | date:'medium' }}</td>
             </tr>
-            <tr *ngIf="filteredLogs().length === 0 && !loading()">
+            <tr *ngIf="sortedLogs().length === 0 && !loading()">
               <td colspan="4" class="empty">No audit logs found.</td>
             </tr>
             <tr *ngIf="loading()">
@@ -98,49 +102,6 @@ interface AuditEntry {
       .page-header h1 { margin: 0 0 4px; font-size: 1.5rem; font-weight: 700; color: #1a2332; }
       .subtitle { margin: 0; color: #64748b; font-size: 0.9rem; }
 
-      .filter-bar {
-        display: flex;
-        align-items: center;
-        gap: 16px;
-        margin-bottom: 16px;
-        flex-wrap: wrap;
-      }
-      .search-box {
-        display: flex;
-        align-items: center;
-        background: #fff;
-        border: 1px solid #e2e8f0;
-        border-radius: 10px;
-        padding: 0 12px;
-        min-width: 200px;
-        max-width: 300px;
-      }
-      .search-icon { color: #94a3b8; font-size: 20px; }
-      .search-box input {
-        border: none;
-        outline: none;
-        padding: 10px 8px;
-        font-size: 0.88rem;
-        background: transparent;
-        width: 100%;
-        font-family: inherit;
-      }
-
-      .filter-chips { display: flex; gap: 6px; flex-wrap: wrap; }
-      .chip {
-        padding: 6px 14px;
-        border-radius: 20px;
-        border: 1px solid #e2e8f0;
-        background: #fff;
-        font-size: 0.8rem;
-        font-weight: 500;
-        cursor: pointer;
-        color: #64748b;
-        transition: all 0.15s;
-        font-family: inherit;
-      }
-      .chip.active { background: #3b82f6; color: #fff; border-color: #3b82f6; }
-
       .table-card {
         background: #fff;
         border-radius: 14px;
@@ -151,7 +112,7 @@ interface AuditEntry {
       table { width: 100%; border-collapse: collapse; }
       th {
         text-align: left;
-        padding: 12px 16px;
+        padding: 10px 16px;
         font-size: 0.78rem;
         font-weight: 600;
         color: #64748b;
@@ -160,6 +121,15 @@ interface AuditEntry {
         background: #f8fafc;
         border-bottom: 1px solid #e2e8f0;
       }
+      th.sortable { cursor: pointer; user-select: none; white-space: nowrap; }
+      th.sortable:hover { color: #334155; }
+      .sort-icon { font-size: 14px; vertical-align: middle; margin-left: 2px; color: #94a3b8; }
+      th.sortable:hover .sort-icon { color: #64748b; }
+      .filter-row th { padding: 6px 16px 10px; background: #f8fafc; border-bottom: 2px solid #e2e8f0; }
+      .th-filter { width: 100%; padding: 6px 10px; border: 1px solid #e2e8f0; border-radius: 6px; font-size: 0.82rem; font-family: inherit; background: #fff; outline: none; color: #334155; box-sizing: border-box; }
+      .th-filter:focus { border-color: #3b82f6; box-shadow: 0 0 0 2px rgba(59,130,246,0.1); }
+      select.th-filter { cursor: pointer; }
+
       td {
         padding: 12px 16px;
         font-size: 0.86rem;
@@ -211,14 +181,31 @@ export class AuditLogsComponent implements OnInit {
   private readonly api = inject(ApiService);
 
   protected actionFilter = '';
+  protected userFilter = '';
+  protected ipFilter = '';
   protected readonly loading = signal(true);
   protected readonly logs = signal<AuditEntry[]>([]);
   protected readonly filteredLogs = signal<AuditEntry[]>([]);
   protected readonly actionTypes = signal<string[]>([]);
   protected readonly page = signal(1);
   protected readonly totalPages = signal(1);
+  protected readonly sortField = signal<SortField | ''>('');
+  protected readonly sortDir = signal<SortDir>('asc');
 
   private readonly perPage = 25;
+
+  protected readonly sortedLogs = computed(() => {
+    const items = this.filteredLogs();
+    const field = this.sortField();
+    const dir = this.sortDir();
+    if (!field) return items;
+    const sorted = [...items].sort((a, b) => {
+      const aVal = (a[field] ?? '').toString().toLowerCase();
+      const bVal = (b[field] ?? '').toString().toLowerCase();
+      return aVal.localeCompare(bVal);
+    });
+    return dir === 'desc' ? sorted.reverse() : sorted;
+  });
 
   ngOnInit() {
     this.loadLogs();
@@ -249,10 +236,30 @@ export class AuditLogsComponent implements OnInit {
   }
 
   protected applyFilter() {
-    const filter = this.actionFilter.toLowerCase();
+    const action = this.actionFilter.toLowerCase();
+    const user = this.userFilter.toLowerCase();
+    const ip = this.ipFilter.toLowerCase();
     this.filteredLogs.set(
-      filter ? this.logs().filter((l) => l.action.toLowerCase().includes(filter)) : this.logs(),
+      this.logs().filter((l) =>
+        (!action || l.action.toLowerCase().includes(action)) &&
+        (!user || (l.userEmail ?? '').toLowerCase().includes(user)) &&
+        (!ip || (l.ip ?? '').toLowerCase().includes(ip))
+      ),
     );
+  }
+
+  protected toggleSort(field: SortField) {
+    if (this.sortField() === field) {
+      this.sortDir.set(this.sortDir() === 'asc' ? 'desc' : 'asc');
+    } else {
+      this.sortField.set(field);
+      this.sortDir.set('asc');
+    }
+  }
+
+  protected getSortIcon(field: SortField): string {
+    if (this.sortField() !== field) return 'unfold_more';
+    return this.sortDir() === 'asc' ? 'arrow_upward' : 'arrow_downward';
   }
 
   protected goToPage(p: number) {

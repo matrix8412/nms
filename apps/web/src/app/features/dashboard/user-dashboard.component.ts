@@ -67,6 +67,7 @@ import type { DeviceDto } from '@nms/shared';
           <table>
             <thead>
               <tr>
+                <th>Status</th>
                 <th>Name</th>
                 <th>IP Address</th>
                 <th>Vendor</th>
@@ -76,6 +77,12 @@ import type { DeviceDto } from '@nms/shared';
             <tbody>
               <tr *ngFor="let host of recentHosts()">
                 <td>
+                  <span class="status-dot"
+                        [class.status-up]="host.icmpStatus === 'UP'"
+                        [class.status-down]="host.icmpStatus === 'DOWN'"
+                        [class.status-unknown]="host.icmpStatus === 'UNKNOWN'"></span>
+                </td>
+                <td>
                   <a [routerLink]="['/hosts', host.id]" class="host-link">{{ host.name }}</a>
                 </td>
                 <td class="mono">{{ host.ip }}</td>
@@ -83,7 +90,7 @@ import type { DeviceDto } from '@nms/shared';
                 <td>{{ host.type || '—' }}</td>
               </tr>
               <tr *ngIf="recentHosts().length === 0">
-                <td colspan="4" class="empty">No hosts registered yet.</td>
+                <td colspan="5" class="empty">No hosts registered yet.</td>
               </tr>
             </tbody>
           </table>
@@ -280,6 +287,19 @@ import type { DeviceDto } from '@nms/shared';
         font-size: 0.78rem;
         font-weight: 600;
       }
+
+      /* Status indicators */
+      .status-dot {
+        display: inline-block;
+        width: 10px;
+        height: 10px;
+        border-radius: 50%;
+        background: #94a3b8;
+        vertical-align: middle;
+      }
+      .status-dot.status-up { background: #22c55e; box-shadow: 0 0 6px rgba(34,197,94,0.4); }
+      .status-dot.status-down { background: #ef4444; box-shadow: 0 0 6px rgba(239,68,68,0.4); }
+      .status-dot.status-unknown { background: #94a3b8; }
     `,
   ],
 })
@@ -303,10 +323,11 @@ export class UserDashboardComponent implements OnInit {
       next: (res) => {
         const devices = res.data;
         this.totalHosts.set(devices.length);
-        // For now assume all are "up" — real status would come from metrics/monitoring
-        this.hostsUp.set(devices.length);
-        this.hostsDown.set(0);
-        this.hostRatio.set(devices.length > 0 ? 100 : 0);
+        const up = devices.filter(d => d.icmpStatus === 'UP').length;
+        const down = devices.filter(d => d.icmpStatus === 'DOWN').length;
+        this.hostsUp.set(up);
+        this.hostsDown.set(down);
+        this.hostRatio.set(devices.length > 0 ? Math.round((up / devices.length) * 100) : 0);
         this.recentHosts.set(devices.slice(0, 5));
       },
     });

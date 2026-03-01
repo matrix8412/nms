@@ -12,6 +12,12 @@ enum UserRole {
   ADMIN
 }
 
+enum IcmpStatus {
+  UNKNOWN
+  UP
+  DOWN
+}
+
 model User {
   id                  String               @id @default(cuid())
   email               String               @unique
@@ -49,16 +55,19 @@ model GroupMember {
 }
 
 model Device {
-  id            String            @id @default(cuid())
-  name          String
-  ip            String            @unique
-  vendor        String?
-  type          String?
-  zabbixHostId  String?
-  createdAt     DateTime          @default(now())
-  updatedAt     DateTime          @updatedAt
-  groups        DeviceGroupDevice[]
-  metrics       DeviceMetric[]
+  id               String            @id @default(cuid())
+  name             String
+  ip               String            @unique
+  vendor           String?
+  type             String?
+  zabbixHostId     String?
+  icmpStatus       IcmpStatus        @default(UNKNOWN)
+  lastPingAt       DateTime?
+  lastPingDuration Float?
+  createdAt        DateTime          @default(now())
+  updatedAt        DateTime          @updatedAt
+  groups           DeviceGroupDevice[]
+  metrics          DeviceMetric[]
 }
 
 model DeviceGroup {

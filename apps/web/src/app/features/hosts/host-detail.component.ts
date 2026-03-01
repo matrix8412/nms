@@ -57,6 +57,25 @@ import type { DeviceDto } from '@nms/shared';
             <span class="info-label">Zabbix Host ID</span>
             <span class="info-value mono">{{ host()!.zabbixHostId || 'Not linked' }}</span>
           </div>
+          <div class="info-row">
+            <span class="info-label">ICMP Status</span>
+            <span class="info-value">
+              <span class="status-badge"
+                    [class.status-up]="host()!.icmpStatus === 'UP'"
+                    [class.status-down]="host()!.icmpStatus === 'DOWN'"
+                    [class.status-unknown]="host()!.icmpStatus === 'UNKNOWN'">
+                <span class="status-dot"></span>
+                {{ host()!.icmpStatus }}
+              </span>
+              <span class="ping-info" *ngIf="host()!.lastPingDuration != null">
+                {{ host()!.lastPingDuration }} ms
+              </span>
+            </span>
+          </div>
+          <div class="info-row" *ngIf="host()!.lastPingAt">
+            <span class="info-label">Last Ping</span>
+            <span class="info-value">{{ host()!.lastPingAt | date:'medium' }}</span>
+          </div>
         </div>
       </div>
 
@@ -200,6 +219,33 @@ import type { DeviceDto } from '@nms/shared';
         color: #0369a1;
         font-size: 0.78rem;
         font-weight: 600;
+      }
+
+      /* Status badge */
+      .status-badge {
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+        padding: 2px 10px;
+        border-radius: 20px;
+        font-size: 0.8rem;
+        font-weight: 600;
+        background: #f1f5f9;
+        color: #94a3b8;
+      }
+      .status-badge .status-dot {
+        width: 8px;
+        height: 8px;
+        border-radius: 50%;
+        background: currentColor;
+      }
+      .status-badge.status-up { background: #dcfce7; color: #16a34a; }
+      .status-badge.status-down { background: #fef2f2; color: #dc2626; }
+      .status-badge.status-unknown { background: #f1f5f9; color: #94a3b8; }
+      .ping-info {
+        margin-left: 8px;
+        font-size: 0.82rem;
+        color: #64748b;
       }
 
       /* Metrics table */

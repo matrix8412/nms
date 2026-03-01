@@ -17,6 +17,8 @@ export type AuthUserDto = {
   groups: Array<{ id: string; name: string; roleInGroup?: string | null }>;
 };
 
+export type IcmpStatus = 'UNKNOWN' | 'UP' | 'DOWN';
+
 export type DeviceDto = {
   id: string;
   name: string;
@@ -24,6 +26,9 @@ export type DeviceDto = {
   vendor?: string | null;
   type?: string | null;
   zabbixHostId?: string | null;
+  icmpStatus: IcmpStatus;
+  lastPingAt?: string | null;
+  lastPingDuration?: number | null;
   groupIds: string[];
 };
 

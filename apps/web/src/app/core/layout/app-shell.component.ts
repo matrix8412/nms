@@ -367,18 +367,11 @@ export class AppShellComponent {
 
   protected readonly userRole = computed(() => this.auth.currentUser()?.role ?? 'USER');
 
-  private readonly expandedGroups = signal<Set<string>>(new Set(['Hosts']));
+  private readonly expandedGroups = signal<Set<string>>(new Set());
 
   private readonly navItems: NavItem[] = [
     { label: 'Dashboard', icon: 'dashboard', route: '/dashboard' },
-    {
-      label: 'Hosts',
-      icon: 'dns',
-      children: [
-        { label: 'All Hosts', route: '/hosts', icon: 'list' },
-        { label: 'Host Groups', route: '/hosts/groups', icon: 'folder' },
-      ],
-    },
+    { label: 'Hosts', icon: 'dns', route: '/hosts' },
     { label: 'Events', icon: 'event_note', route: '/events' },
     {
       label: 'Settings',
@@ -392,6 +385,7 @@ export class AppShellComponent {
         { label: 'Integrations', route: '/settings/integrations', icon: 'extension' },
         { label: 'Plugins', route: '/settings/plugins', icon: 'power' },
         { label: 'Catalogs', route: '/settings/catalogs', icon: 'inventory_2' },
+        { label: 'Host Groups', route: '/settings/host-groups', icon: 'folder' },
       ],
     },
   ];

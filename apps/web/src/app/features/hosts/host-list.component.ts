@@ -1,11 +1,14 @@
 import { CommonModule } from '@angular/common';
-import { Component, inject, OnInit, signal } from '@angular/core';
+import { Component, inject, OnInit, signal, computed } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { Router, RouterLink } from '@angular/router';
 import { ApiService } from '../../core/http/api.service';
 import { SlidePanelComponent } from '../../core/layout/slide-panel.component';
 import { HostFormComponent } from './host-form.component';
 import type { DeviceDto } from '@nms/shared';
+
+type SortField = 'icmpStatus' | 'name' | 'ip' | 'vendor' | 'type' | 'zabbixHostId';
+type SortDir = 'asc' | 'desc';
 
 @Component({
   selector: 'app-host-list',
@@ -23,48 +26,82 @@ import type { DeviceDto } from '@nms/shared';
       </button>
     </div>
 
-    <!-- Filters -->
-    <div class="filter-bar">
-      <div class="search-box">
-        <span class="material-icons search-icon">search</span>
-        <input
-          type="text"
-          placeholder="Search by name, IP, vendor..."
-          [(ngModel)]="searchQuery"
-          (ngModelChange)="onSearch()"
-        />
-      </div>
-      <div class="filter-chips">
-        <button
-          class="chip"
-          [class.active]="typeFilter() === ''"
-          (click)="setTypeFilter('')"
-        >All</button>
-        <button
-          *ngFor="let t of availableTypes()"
-          class="chip"
-          [class.active]="typeFilter() === t"
-          (click)="setTypeFilter(t)"
-        >{{ t }}</button>
-      </div>
-    </div>
-
     <!-- Table -->
     <div class="table-card">
       <div class="table-wrap">
         <table>
           <thead>
             <tr>
-              <th>Name</th>
-              <th>IP Address</th>
-              <th>Vendor</th>
-              <th>Type</th>
-              <th>Zabbix ID</th>
+              <th class="sortable status-col" (click)="toggleSort('icmpStatus')">
+                Status
+                <span class="sort-icon material-icons">{{ getSortIcon('icmpStatus') }}</span>
+              </th>
+              <th class="sortable" (click)="toggleSort('name')">
+                Name
+                <span class="sort-icon material-icons">{{ getSortIcon('name') }}</span>
+              </th>
+              <th class="sortable" (click)="toggleSort('ip')">
+                IP Address
+                <span class="sort-icon material-icons">{{ getSortIcon('ip') }}</span>
+              </th>
+              <th class="sortable" (click)="toggleSort('vendor')">
+                Vendor
+                <span class="sort-icon material-icons">{{ getSortIcon('vendor') }}</span>
+              </th>
+              <th class="sortable" (click)="toggleSort('type')">
+                Type
+                <span class="sort-icon material-icons">{{ getSortIcon('type') }}</span>
+              </th>
+              <th class="sortable" (click)="toggleSort('zabbixHostId')">
+                Zabbix ID
+                <span class="sort-icon material-icons">{{ getSortIcon('zabbixHostId') }}</span>
+              </th>
               <th class="actions-col">Actions</th>
+            </tr>
+            <tr class="filter-row">
+              <th>
+                <select class="th-filter" [(ngModel)]="filterStatus" (ngModelChange)="applyFilter()">
+                  <option value="">All</option>
+                  <option value="UP">Up</option>
+                  <option value="DOWN">Down</option>
+                  <option value="UNKNOWN">Unknown</option>
+                </select>
+              </th>
+              <th>
+                <input type="text" class="th-filter" placeholder="Search…" [(ngModel)]="filterName" (ngModelChange)="applyFilter()" />
+              </th>
+              <th>
+                <input type="text" class="th-filter" placeholder="Search…" [(ngModel)]="filterIp" (ngModelChange)="applyFilter()" />
+              </th>
+              <th>
+                <input type="text" class="th-filter" placeholder="Search…" [(ngModel)]="filterVendor" (ngModelChange)="applyFilter()" />
+              </th>
+              <th>
+                <select class="th-filter" [(ngModel)]="filterType" (ngModelChange)="applyFilter()">
+                  <option value="">All</option>
+                  <option *ngFor="let t of availableTypes()" [value]="t">{{ t }}</option>
+                </select>
+              </th>
+              <th></th>
+              <th></th>
             </tr>
           </thead>
           <tbody>
-            <tr *ngFor="let host of filteredHosts()" class="row-hover">
+            <tr *ngFor="let host of sortedHosts()" class="row-hover">
+              <td class="status-col">
+                <span class="status-dot"
+                      [class.status-up]="host.icmpStatus === 'UP'"
+                      [class.status-down]="host.icmpStatus === 'DOWN'"
+                      [class.status-unknown]="host.icmpStatus === 'UNKNOWN'"
+                      [title]="host.icmpStatus + (host.lastPingDuration != null ? ' (' + host.lastPingDuration + ' ms)' : '')">
+                </span>
+                <span class="status-label"
+                      [class.status-up-text]="host.icmpStatus === 'UP'"
+                      [class.status-down-text]="host.icmpStatus === 'DOWN'"
+                      [class.status-unknown-text]="host.icmpStatus === 'UNKNOWN'">
+                  {{ host.icmpStatus }}
+                </span>
+              </td>
               <td>
                 <a [routerLink]="['/hosts', host.id]" class="host-link">{{ host.name }}</a>
               </td>
@@ -87,13 +124,11 @@ import type { DeviceDto } from '@nms/shared';
                 </button>
               </td>
             </tr>
-            <tr *ngIf="filteredHosts().length === 0 && !loading()">
-              <td colspan="6" class="empty">
-                {{ searchQuery ? 'No hosts matching your search.' : 'No hosts found. Add your first host.' }}
-              </td>
+            <tr *ngIf="sortedHosts().length === 0 && !loading()">
+              <td colspan="7" class="empty">No hosts matching your filters.</td>
             </tr>
             <tr *ngIf="loading()">
-              <td colspan="6" class="empty">Loading...</td>
+              <td colspan="7" class="empty">Loading...</td>
             </tr>
           </tbody>
         </table>
@@ -153,65 +188,12 @@ import type { DeviceDto } from '@nms/shared';
         font-family: inherit;
       }
       .btn .material-icons { font-size: 18px; }
-      .btn-primary {
-        background: #3b82f6;
-        color: #fff;
-      }
+      .btn-primary { background: #3b82f6; color: #fff; }
       .btn-primary:hover { background: #2563eb; box-shadow: 0 2px 8px rgba(59,130,246,0.3); }
       .btn-secondary { background: #e2e8f0; color: #475569; }
       .btn-secondary:hover { background: #cbd5e1; }
       .btn-danger { background: #ef4444; color: #fff; }
       .btn-danger:hover { background: #dc2626; }
-
-      /* Filters */
-      .filter-bar {
-        display: flex;
-        align-items: center;
-        gap: 16px;
-        margin-bottom: 16px;
-        flex-wrap: wrap;
-      }
-      .search-box {
-        display: flex;
-        align-items: center;
-        background: #fff;
-        border: 1px solid #e2e8f0;
-        border-radius: 10px;
-        padding: 0 12px;
-        flex: 1;
-        min-width: 220px;
-        max-width: 400px;
-      }
-      .search-icon { color: #94a3b8; font-size: 20px; }
-      .search-box input {
-        border: none;
-        outline: none;
-        padding: 10px 8px;
-        font-size: 0.88rem;
-        background: transparent;
-        width: 100%;
-        font-family: inherit;
-      }
-
-      .filter-chips { display: flex; gap: 6px; flex-wrap: wrap; }
-      .chip {
-        padding: 6px 14px;
-        border-radius: 20px;
-        border: 1px solid #e2e8f0;
-        background: #fff;
-        font-size: 0.8rem;
-        font-weight: 500;
-        cursor: pointer;
-        color: #64748b;
-        transition: all 0.15s;
-        font-family: inherit;
-      }
-      .chip.active {
-        background: #3b82f6;
-        color: #fff;
-        border-color: #3b82f6;
-      }
-      .chip:hover:not(.active) { border-color: #94a3b8; }
 
       /* Table */
       .table-card {
@@ -224,7 +206,7 @@ import type { DeviceDto } from '@nms/shared';
       table { width: 100%; border-collapse: collapse; }
       th {
         text-align: left;
-        padding: 12px 16px;
+        padding: 10px 16px;
         font-size: 0.78rem;
         font-weight: 600;
         color: #64748b;
@@ -233,6 +215,50 @@ import type { DeviceDto } from '@nms/shared';
         background: #f8fafc;
         border-bottom: 1px solid #e2e8f0;
       }
+      th.sortable { cursor: pointer; user-select: none; white-space: nowrap; }
+      th.sortable:hover { color: #334155; }
+      .sort-icon { font-size: 14px; vertical-align: middle; margin-left: 2px; color: #94a3b8; }
+      th.sortable:hover .sort-icon { color: #64748b; }
+
+      .filter-row th {
+        padding: 6px 16px 10px;
+        background: #f8fafc;
+        border-bottom: 2px solid #e2e8f0;
+      }
+      .th-filter {
+        width: 100%;
+        padding: 6px 10px;
+        border: 1px solid #e2e8f0;
+        border-radius: 6px;
+        font-size: 0.82rem;
+        font-family: inherit;
+        background: #fff;
+        outline: none;
+        color: #334155;
+        box-sizing: border-box;
+      }
+      .th-filter:focus { border-color: #3b82f6; box-shadow: 0 0 0 2px rgba(59,130,246,0.1); }
+      select.th-filter { cursor: pointer; }
+
+      /* Status indicators */
+      .status-col { width: 90px; text-align: center; }
+      .status-dot {
+        display: inline-block;
+        width: 10px;
+        height: 10px;
+        border-radius: 50%;
+        margin-right: 6px;
+        vertical-align: middle;
+        background: #94a3b8;
+      }
+      .status-dot.status-up { background: #22c55e; box-shadow: 0 0 6px rgba(34,197,94,0.4); }
+      .status-dot.status-down { background: #ef4444; box-shadow: 0 0 6px rgba(239,68,68,0.4); }
+      .status-dot.status-unknown { background: #94a3b8; }
+      .status-label { font-size: 0.78rem; font-weight: 600; vertical-align: middle; }
+      .status-up-text { color: #16a34a; }
+      .status-down-text { color: #dc2626; }
+      .status-unknown-text { color: #94a3b8; }
+
       td {
         padding: 12px 16px;
         font-size: 0.86rem;
@@ -303,17 +329,35 @@ export class HostListComponent implements OnInit {
   private readonly api = inject(ApiService);
   private readonly router = inject(Router);
 
-  protected searchQuery = '';
+  protected filterName = '';
+  protected filterIp = '';
+  protected filterVendor = '';
+  protected filterType = '';
+  protected filterStatus = '';
   protected readonly loading = signal(true);
   protected readonly hosts = signal<DeviceDto[]>([]);
-  protected readonly typeFilter = signal('');
   protected readonly panelOpen = signal(false);
   protected readonly editingHost = signal<DeviceDto | null>(null);
   protected readonly deletingHost = signal<DeviceDto | null>(null);
 
   protected readonly availableTypes = signal<string[]>([]);
-
   protected readonly filteredHosts = signal<DeviceDto[]>([]);
+
+  protected readonly sortField = signal<SortField | ''>('');
+  protected readonly sortDir = signal<SortDir>('asc');
+
+  protected readonly sortedHosts = computed(() => {
+    const items = this.filteredHosts();
+    const field = this.sortField();
+    const dir = this.sortDir();
+    if (!field) return items;
+    const sorted = [...items].sort((a, b) => {
+      const aVal = (a[field] ?? '').toString().toLowerCase();
+      const bVal = (b[field] ?? '').toString().toLowerCase();
+      return aVal.localeCompare(bVal);
+    });
+    return dir === 'desc' ? sorted.reverse() : sorted;
+  });
 
   ngOnInit() {
     this.loadHosts();
@@ -321,7 +365,7 @@ export class HostListComponent implements OnInit {
 
   private loadHosts() {
     this.loading.set(true);
-    this.api.getDevices(this.searchQuery).subscribe({
+    this.api.getDevices().subscribe({
       next: (res) => {
         this.hosts.set(res.data);
         this.extractTypes(res.data);
@@ -340,21 +384,35 @@ export class HostListComponent implements OnInit {
     this.availableTypes.set([...types].sort());
   }
 
-  private applyFilter() {
-    const filter = this.typeFilter();
-    const hosts = this.hosts();
+  protected applyFilter() {
+    const name = this.filterName.toLowerCase();
+    const ip = this.filterIp.toLowerCase();
+    const vendor = this.filterVendor.toLowerCase();
+    const type = this.filterType;
+    const status = this.filterStatus;
     this.filteredHosts.set(
-      filter ? hosts.filter((h) => h.type === filter) : hosts,
+      this.hosts().filter((h) =>
+        (!name || (h.name ?? '').toLowerCase().includes(name)) &&
+        (!ip || (h.ip ?? '').toLowerCase().includes(ip)) &&
+        (!vendor || (h.vendor ?? '').toLowerCase().includes(vendor)) &&
+        (!type || h.type === type) &&
+        (!status || h.icmpStatus === status)
+      ),
     );
   }
 
-  protected onSearch() {
-    this.loadHosts();
+  protected toggleSort(field: SortField) {
+    if (this.sortField() === field) {
+      this.sortDir.set(this.sortDir() === 'asc' ? 'desc' : 'asc');
+    } else {
+      this.sortField.set(field);
+      this.sortDir.set('asc');
+    }
   }
 
-  protected setTypeFilter(t: string) {
-    this.typeFilter.set(t);
-    this.applyFilter();
+  protected getSortIcon(field: SortField): string {
+    if (this.sortField() !== field) return 'unfold_more';
+    return this.sortDir() === 'asc' ? 'arrow_upward' : 'arrow_downward';
   }
 
   protected openAddPanel() {

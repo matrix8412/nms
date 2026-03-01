@@ -11,6 +11,9 @@ function toDeviceDto(
     vendor: string | null;
     type: string | null;
     zabbixHostId: string | null;
+    icmpStatus: string;
+    lastPingAt: Date | null;
+    lastPingDuration: number | null;
   },
   groupIds: string[],
 ): DeviceDto {
@@ -21,6 +24,9 @@ function toDeviceDto(
     vendor: device.vendor,
     type: device.type,
     zabbixHostId: device.zabbixHostId,
+    icmpStatus: device.icmpStatus as DeviceDto['icmpStatus'],
+    lastPingAt: device.lastPingAt?.toISOString() ?? null,
+    lastPingDuration: device.lastPingDuration,
     groupIds,
   };
 }
@@ -58,6 +64,9 @@ export async function listDevices(session: NonNullable<SessionUser>, search?: st
     vendor: string | null;
     type: string | null;
     zabbixHostId: string | null;
+    icmpStatus: string;
+    lastPingAt: Date | null;
+    lastPingDuration: number | null;
   }> = [];
 
   if (normalizedSearch) {
@@ -71,10 +80,14 @@ export async function listDevices(session: NonNullable<SessionUser>, search?: st
           vendor: string | null;
           type: string | null;
           zabbixHostId: string | null;
+          icmpStatus: string;
+          lastPingAt: Date | null;
+          lastPingDuration: number | null;
         }>
       >(
         Prisma.sql`
-          SELECT d."id", d."name", d."ip", d."vendor", d."type", d."zabbixHostId"
+          SELECT d."id", d."name", d."ip", d."vendor", d."type", d."zabbixHostId",
+                 d."icmpStatus"::text, d."lastPingAt", d."lastPingDuration"
           FROM "Device" d
           WHERE unaccent(lower(d."name")) LIKE unaccent(lower(${searchPattern}))
              OR unaccent(lower(d."ip")) LIKE unaccent(lower(${searchPattern}))
@@ -92,10 +105,14 @@ export async function listDevices(session: NonNullable<SessionUser>, search?: st
           vendor: string | null;
           type: string | null;
           zabbixHostId: string | null;
+          icmpStatus: string;
+          lastPingAt: Date | null;
+          lastPingDuration: number | null;
         }>
       >(
         Prisma.sql`
-          SELECT DISTINCT d."id", d."name", d."ip", d."vendor", d."type", d."zabbixHostId"
+          SELECT DISTINCT d."id", d."name", d."ip", d."vendor", d."type", d."zabbixHostId",
+                 d."icmpStatus"::text, d."lastPingAt", d."lastPingDuration"
           FROM "Device" d
           JOIN "DeviceGroupDevice" dgd ON dgd."deviceId" = d."id"
           JOIN "GroupDeviceAccess" gda ON gda."deviceGroupId" = dgd."deviceGroupId"
@@ -135,6 +152,9 @@ export async function listDevices(session: NonNullable<SessionUser>, search?: st
         vendor: true,
         type: true,
         zabbixHostId: true,
+        icmpStatus: true,
+        lastPingAt: true,
+        lastPingDuration: true,
       },
       orderBy: { name: 'asc' },
     });
@@ -203,6 +223,9 @@ export async function getDeviceById(deviceId: string, session: NonNullable<Sessi
         vendor: device.vendor,
         type: device.type,
         zabbixHostId: device.zabbixHostId,
+        icmpStatus: device.icmpStatus,
+        lastPingAt: device.lastPingAt,
+        lastPingDuration: device.lastPingDuration,
       },
       device.groups.map((item) => item.deviceGroupId),
     ),

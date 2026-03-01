@@ -14,6 +14,9 @@ interface Role {
   createdAt: string;
 }
 
+type SortField = 'name' | 'description' | 'permissions';
+type SortDir = 'asc' | 'desc';
+
 const RESOURCES = ['devices', 'device-groups', 'events', 'audit-logs', 'users', 'settings', 'integrations', 'catalogs'] as const;
 const ACTIONS = ['read', 'create', 'update', 'delete'] as const;
 
@@ -33,17 +36,36 @@ const ACTIONS = ['read', 'create', 'update', 'delete'] as const;
     </div>
 
     <div class="table-card">
-      <table class="data-table" *ngIf="roles().length; else emptyState">
+      <table class="data-table" *ngIf="sortedRoles().length; else emptyState">
         <thead>
           <tr>
-            <th>Role Name</th>
-            <th>Description</th>
-            <th>Permissions</th>
+            <th class="sortable" (click)="toggleSort('name')">
+              Role Name
+              <span class="sort-icon material-icons">{{ getSortIcon('name') }}</span>
+            </th>
+            <th class="sortable" (click)="toggleSort('description')">
+              Description
+              <span class="sort-icon material-icons">{{ getSortIcon('description') }}</span>
+            </th>
+            <th class="sortable" (click)="toggleSort('permissions')">
+              Permissions
+              <span class="sort-icon material-icons">{{ getSortIcon('permissions') }}</span>
+            </th>
             <th class="col-actions">Actions</th>
+          </tr>
+          <tr class="filter-row">
+            <th>
+              <input type="text" class="th-filter" placeholder="Search…" [ngModel]="filterName()" (ngModelChange)="filterName.set($event)" />
+            </th>
+            <th>
+              <input type="text" class="th-filter" placeholder="Search…" [ngModel]="filterDescription()" (ngModelChange)="filterDescription.set($event)" />
+            </th>
+            <th></th>
+            <th></th>
           </tr>
         </thead>
         <tbody>
-          <tr *ngFor="let r of roles()">
+          <tr *ngFor="let r of sortedRoles()">
             <td class="cell-name">
               {{ r.name }}
               <span class="badge built-in" *ngIf="r.builtIn">Built-in</span>
@@ -134,7 +156,14 @@ const ACTIONS = ['read', 'create', 'update', 'delete'] as const;
 
     .table-card { background: #fff; border-radius: 14px; box-shadow: 0 1px 4px rgba(0,0,0,.06); overflow: hidden; }
     .data-table { width: 100%; border-collapse: collapse; }
-    .data-table th { text-align: left; padding: 10px 20px; font-size: 0.78rem; text-transform: uppercase; letter-spacing: 0.5px; color: #94a3b8; font-weight: 600; border-bottom: 1px solid #e2e8f0; }
+    .data-table th { text-align: left; padding: 10px 20px; font-size: 0.78rem; text-transform: uppercase; letter-spacing: 0.5px; color: #94a3b8; font-weight: 600; border-bottom: 1px solid #e2e8f0; background: #f8fafc; }
+    .data-table th.sortable { cursor: pointer; user-select: none; white-space: nowrap; }
+    .data-table th.sortable:hover { color: #334155; }
+    .sort-icon { font-size: 14px; vertical-align: middle; margin-left: 2px; color: #c0c8d4; }
+    .data-table th.sortable:hover .sort-icon { color: #64748b; }
+    .filter-row th { padding: 6px 20px 10px; background: #f8fafc; border-bottom: 2px solid #e2e8f0; }
+    .th-filter { width: 100%; padding: 6px 10px; border: 1px solid #e2e8f0; border-radius: 6px; font-size: 0.82rem; font-family: inherit; background: #fff; outline: none; color: #334155; box-sizing: border-box; }
+    .th-filter:focus { border-color: #3b82f6; box-shadow: 0 0 0 2px rgba(59,130,246,.1); }
     .data-table td { padding: 12px 20px; font-size: 0.88rem; color: #334155; border-bottom: 1px solid #f1f5f9; }
     .cell-name { font-weight: 600; color: #1a2332; white-space: nowrap; }
     .cell-desc { color: #64748b; max-width: 300px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
@@ -187,6 +216,10 @@ export class RolesComponent implements OnInit {
   protected readonly actions = ACTIONS;
 
   protected readonly roles = signal<Role[]>([]);
+  protected readonly filterName = signal('');
+  protected readonly filterDescription = signal('');
+  protected readonly sortField = signal<SortField | ''>('');
+  protected readonly sortDir = signal<SortDir>('asc');
   protected readonly panelOpen = signal(false);
   protected readonly editing = signal<Role | null>(null);
   protected readonly deleteTarget = signal<Role | null>(null);
@@ -194,6 +227,43 @@ export class RolesComponent implements OnInit {
   protected formName = '';
   protected formDesc = '';
   protected formPermissions = signal<Set<string>>(new Set());
+
+  protected readonly filteredRoles = computed(() => {
+    const name = this.filterName().toLowerCase();
+    const desc = this.filterDescription().toLowerCase();
+    return this.roles().filter((r) =>
+      (!name || r.name.toLowerCase().includes(name)) &&
+      (!desc || (r.description ?? '').toLowerCase().includes(desc))
+    );
+  });
+
+  protected readonly sortedRoles = computed(() => {
+    const items = this.filteredRoles();
+    const field = this.sortField();
+    const dir = this.sortDir();
+    if (!field) return items;
+    const sorted = [...items].sort((a, b) => {
+      if (field === 'permissions') return a.permissions.length - b.permissions.length;
+      const aVal = (a[field] ?? '').toString().toLowerCase();
+      const bVal = (b[field] ?? '').toString().toLowerCase();
+      return aVal.localeCompare(bVal);
+    });
+    return dir === 'desc' ? sorted.reverse() : sorted;
+  });
+
+  protected toggleSort(field: SortField) {
+    if (this.sortField() === field) {
+      this.sortDir.set(this.sortDir() === 'asc' ? 'desc' : 'asc');
+    } else {
+      this.sortField.set(field);
+      this.sortDir.set('asc');
+    }
+  }
+
+  protected getSortIcon(field: SortField): string {
+    if (this.sortField() !== field) return 'unfold_more';
+    return this.sortDir() === 'asc' ? 'arrow_upward' : 'arrow_downward';
+  }
 
   ngOnInit() {
     this.load();

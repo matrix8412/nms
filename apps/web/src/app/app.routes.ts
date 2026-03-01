@@ -49,7 +49,6 @@ export const routes: Routes = [
     children: [
       { path: 'dashboard', component: UserDashboardComponent },
       { path: 'hosts', component: HostListComponent },
-      { path: 'hosts/groups', component: HostGroupsComponent },
       { path: 'hosts/:id', component: HostDetailComponent },
       { path: 'events', component: EventsComponent },
 
@@ -61,12 +60,14 @@ export const routes: Routes = [
       { path: 'settings/integrations', component: IntegrationsComponent, canActivate: [adminGuard] },
       { path: 'settings/plugins', component: PluginsComponent, canActivate: [adminGuard] },
       { path: 'settings/catalogs', component: CatalogsComponent, canActivate: [adminGuard] },
+      { path: 'settings/host-groups', component: HostGroupsComponent, canActivate: [adminGuard] },
 
       // Legacy redirects
       { path: 'devices', redirectTo: 'hosts', pathMatch: 'full' },
       { path: 'devices/:id', redirectTo: 'hosts/:id' },
       { path: 'admin', redirectTo: 'dashboard', pathMatch: 'full' },
       { path: 'admin/users', redirectTo: 'settings/users', pathMatch: 'full' },
+      { path: 'hosts/groups', redirectTo: 'settings/host-groups', pathMatch: 'full' },
       { path: 'admin/groups', redirectTo: 'settings', pathMatch: 'full' },
       { path: 'admin/devices', redirectTo: 'hosts', pathMatch: 'full' },
       { path: 'users', redirectTo: 'settings/users', pathMatch: 'full' },

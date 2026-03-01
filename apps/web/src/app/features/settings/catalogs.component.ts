@@ -6,6 +6,9 @@ import { SlidePanelComponent } from '../../core/layout/slide-panel.component';
 
 interface CatalogItem { id: string; name: string; createdAt: string; }
 
+type SortField = 'name' | 'createdAt';
+type SortDir = 'asc' | 'desc';
+
 @Component({
   selector: 'app-catalogs',
   standalone: true,
@@ -31,25 +34,35 @@ interface CatalogItem { id: string; name: string; createdAt: string; }
     <!-- Content -->
     <div class="table-card">
       <div class="table-toolbar">
-        <div class="search-box">
-          <span class="material-icons">search</span>
-          <input type="text" [placeholder]="'Search ' + activeTab() + '…'" [ngModel]="searchQuery()" (ngModelChange)="searchQuery.set($event)" />
-        </div>
+        <div style="flex:1"></div>
         <button class="btn btn-primary" (click)="openCreate()">
           <span class="material-icons">add</span> Add {{ activeTab() === 'vendors' ? 'Vendor' : 'Device Type' }}
         </button>
       </div>
 
-      <table class="data-table" *ngIf="filteredItems().length; else emptyState">
+      <table class="data-table" *ngIf="sortedItems().length; else emptyState">
         <thead>
           <tr>
-            <th>Name</th>
-            <th>Created</th>
+            <th class="sortable" (click)="toggleSort('name')">
+              Name
+              <span class="sort-icon material-icons">{{ getSortIcon('name') }}</span>
+            </th>
+            <th class="sortable" (click)="toggleSort('createdAt')">
+              Created
+              <span class="sort-icon material-icons">{{ getSortIcon('createdAt') }}</span>
+            </th>
             <th class="col-actions">Actions</th>
+          </tr>
+          <tr class="filter-row">
+            <th>
+              <input type="text" class="th-filter" placeholder="Search…" [ngModel]="searchQuery()" (ngModelChange)="searchQuery.set($event)" />
+            </th>
+            <th></th>
+            <th></th>
           </tr>
         </thead>
         <tbody>
-          <tr *ngFor="let item of filteredItems()">
+          <tr *ngFor="let item of sortedItems()">
             <td class="cell-name">{{ item.name }}</td>
             <td class="cell-date">{{ item.createdAt | date:'mediumDate' }}</td>
             <td class="col-actions">
@@ -123,12 +136,16 @@ interface CatalogItem { id: string; name: string; createdAt: string; }
 
     .table-card { background: #fff; border-radius: 14px; box-shadow: 0 1px 4px rgba(0,0,0,.06); overflow: hidden; }
     .table-toolbar { display: flex; padding: 14px 20px; border-bottom: 1px solid #e2e8f0; gap: 12px; align-items: center; }
-    .search-box { display: flex; align-items: center; gap: 8px; background: #f8fafc; border-radius: 8px; padding: 6px 12px; flex: 1; max-width: 360px; }
-    .search-box .material-icons { font-size: 18px; color: #94a3b8; }
-    .search-box input { border: none; background: none; outline: none; font-size: 0.88rem; width: 100%; }
 
     .data-table { width: 100%; border-collapse: collapse; }
-    .data-table th { text-align: left; padding: 10px 20px; font-size: 0.78rem; text-transform: uppercase; letter-spacing: 0.5px; color: #94a3b8; font-weight: 600; border-bottom: 1px solid #e2e8f0; }
+    .data-table th { text-align: left; padding: 10px 20px; font-size: 0.78rem; text-transform: uppercase; letter-spacing: 0.5px; color: #94a3b8; font-weight: 600; border-bottom: 1px solid #e2e8f0; background: #f8fafc; }
+    .data-table th.sortable { cursor: pointer; user-select: none; white-space: nowrap; }
+    .data-table th.sortable:hover { color: #334155; }
+    .sort-icon { font-size: 14px; vertical-align: middle; margin-left: 2px; color: #c0c8d4; }
+    .data-table th.sortable:hover .sort-icon { color: #64748b; }
+    .filter-row th { padding: 6px 20px 10px; background: #f8fafc; border-bottom: 2px solid #e2e8f0; }
+    .th-filter { width: 100%; padding: 6px 10px; border: 1px solid #e2e8f0; border-radius: 6px; font-size: 0.82rem; font-family: inherit; background: #fff; outline: none; color: #334155; box-sizing: border-box; }
+    .th-filter:focus { border-color: #3b82f6; box-shadow: 0 0 0 2px rgba(59,130,246,.1); }
     .data-table td { padding: 12px 20px; font-size: 0.88rem; color: #334155; border-bottom: 1px solid #f1f5f9; }
     .cell-name { font-weight: 600; color: #1a2332; }
     .cell-date { color: #64748b; font-size: 0.84rem; }
@@ -163,6 +180,8 @@ export class CatalogsComponent implements OnInit {
   protected readonly vendors = signal<CatalogItem[]>([]);
   protected readonly deviceTypes = signal<CatalogItem[]>([]);
   protected readonly searchQuery = signal('');
+  protected readonly sortField = signal<SortField | ''>('');
+  protected readonly sortDir = signal<SortDir>('asc');
   protected readonly panelOpen = signal(false);
   protected readonly editingItem = signal<CatalogItem | null>(null);
   protected readonly deleteTarget = signal<CatalogItem | null>(null);
@@ -174,6 +193,33 @@ export class CatalogsComponent implements OnInit {
     const items = this.activeTab() === 'vendors' ? this.vendors() : this.deviceTypes();
     return items.filter((i) => i.name.toLowerCase().includes(q));
   });
+
+  protected readonly sortedItems = computed(() => {
+    const items = this.filteredItems();
+    const field = this.sortField();
+    const dir = this.sortDir();
+    if (!field) return items;
+    const sorted = [...items].sort((a, b) => {
+      const aVal = (a[field] ?? '').toString().toLowerCase();
+      const bVal = (b[field] ?? '').toString().toLowerCase();
+      return aVal.localeCompare(bVal);
+    });
+    return dir === 'desc' ? sorted.reverse() : sorted;
+  });
+
+  protected toggleSort(field: SortField) {
+    if (this.sortField() === field) {
+      this.sortDir.set(this.sortDir() === 'asc' ? 'desc' : 'asc');
+    } else {
+      this.sortField.set(field);
+      this.sortDir.set('asc');
+    }
+  }
+
+  protected getSortIcon(field: SortField): string {
+    if (this.sortField() !== field) return 'unfold_more';
+    return this.sortDir() === 'asc' ? 'arrow_upward' : 'arrow_downward';
+  }
 
   ngOnInit() {
     this.loadAll();
