@@ -15,6 +15,13 @@ interface UserEntry {
 type SortField = 'email' | 'role' | 'emailVerifiedAt' | 'createdAt';
 type SortDir = 'asc' | 'desc';
 
+interface RoleEntry {
+  id: string;
+  name: string;
+  description: string | null;
+  builtIn: boolean;
+}
+
 @Component({
   selector: 'app-users',
   standalone: true,
@@ -253,13 +260,6 @@ type SortDir = 'asc' | 'desc';
     `,
   ],
 })
-interface RoleEntry {
-  id: string;
-  name: string;
-  description: string | null;
-  builtIn: boolean;
-}
-
 export class UsersComponent implements OnInit {
   private readonly api = inject(ApiService);
 
