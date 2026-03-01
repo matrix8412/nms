@@ -41,12 +41,15 @@ async function loadIcmpSettings(): Promise<IcmpSettings> {
     const config = await prisma.integrationConfig.findUnique({
       where: { provider: 'icmp' },
     });
-    if (!config || !config.enabled) {
-      return { ...ICMP_DEFAULTS, enabled: config?.enabled ?? ICMP_DEFAULTS.enabled };
+    if (!config) {
+      return ICMP_DEFAULTS;
     }
-    const s = config.settings as Record<string, unknown>;
+    if (!config.enabled) {
+      return { ...ICMP_DEFAULTS, enabled: false };
+    }
+    const s = (config.settings ?? {}) as Record<string, unknown>;
     return {
-      enabled: config.enabled,
+      enabled: true,
       intervalSec: typeof s['intervalSec'] === 'number' ? s['intervalSec'] : ICMP_DEFAULTS.intervalSec,
       timeoutSec: typeof s['timeoutSec'] === 'number' ? s['timeoutSec'] : ICMP_DEFAULTS.timeoutSec,
       retries: typeof s['retries'] === 'number' ? s['retries'] : ICMP_DEFAULTS.retries,
@@ -99,9 +102,9 @@ async function enqueuePingBatch() {
     devices.map((device: { id: string; ip: string }) =>
       pingQueue.add(
         'ping-device',
-        { deviceId: device.id, ip: device.ip, timeoutSec: icmp.timeoutSec },
+        { deviceId: device.id, ip: device.ip, timeoutSec: icmp.timeoutSec, retries: icmp.retries },
         {
-          attempts: icmp.retries,
+          attempts: 2,
           removeOnComplete: 1000,
           removeOnFail: 1000,
         },

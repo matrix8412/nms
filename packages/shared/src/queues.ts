@@ -11,4 +11,5 @@ export type DevicePingJobPayload = {
   deviceId: string;
   ip: string;
   timeoutSec?: number;
+  retries?: number;
 };

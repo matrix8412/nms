@@ -27,6 +27,10 @@ FROM base AS runtime
 
 ENV NODE_ENV=production
 
+# Install iputils-ping for ICMP monitoring (worker needs the `ping` command)
+RUN apt-get update && apt-get install -y --no-install-recommends iputils-ping \
+    && rm -rf /var/lib/apt/lists/*
+
 # Copy workspace structure (package.json files, lockfile, configs)
 COPY --from=build /app/package.json /app/pnpm-lock.yaml /app/pnpm-workspace.yaml /app/turbo.json /app/tsconfig.base.json /app/
 COPY --from=build /app/.npmrc* /app/

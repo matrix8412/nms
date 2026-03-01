@@ -1,5 +1,8 @@
 import { exec } from 'node:child_process';
 import { prisma } from '@nms/db';
+import pino from 'pino';
+
+const logger = pino({ name: '@nms/worker:ping' });
 
 /**
  * Ping a single IP address using the system `ping` command.
@@ -14,8 +17,9 @@ export function pingHost(ip: string, timeoutSec = 3): Promise<number | null> {
       ? `ping -n 1 -w ${timeoutSec * 1000} ${ip}`
       : `ping -c 1 -W ${timeoutSec} ${ip}`;
 
-    exec(cmd, { timeout: (timeoutSec + 2) * 1000 }, (error: Error | null, stdout: string) => {
+    exec(cmd, { timeout: (timeoutSec + 2) * 1000 }, (error, stdout, stderr) => {
       if (error) {
+        logger.debug({ ip, code: (error as NodeJS.ErrnoException).code, stderr }, 'ping failed');
         resolve(null);
         return;
       }
@@ -35,10 +39,24 @@ export function pingHost(ip: string, timeoutSec = 3): Promise<number | null> {
 }
 
 /**
- * Ping a device and update its ICMP status in the database.
+ * Ping a device with retries, then update its ICMP status in the database.
  */
-export async function pingDevice(deviceId: string, ip: string, timeoutSec = 3) {
-  const rtt = await pingHost(ip, timeoutSec);
+export async function pingDevice(
+  deviceId: string,
+  ip: string,
+  timeoutSec = 3,
+  retries = 1,
+) {
+  let rtt: number | null = null;
+
+  for (let attempt = 1; attempt <= retries; attempt++) {
+    rtt = await pingHost(ip, timeoutSec);
+    if (rtt !== null) break;
+    if (attempt < retries) {
+      logger.debug({ ip, attempt, retries }, 'ping retry');
+    }
+  }
+
   const isUp = rtt !== null;
 
   await prisma.device.update({
@@ -49,4 +67,6 @@ export async function pingDevice(deviceId: string, ip: string, timeoutSec = 3) {
       lastPingDuration: rtt,
     },
   });
+
+  logger.debug({ deviceId, ip, isUp, rtt }, 'device ping result');
 }

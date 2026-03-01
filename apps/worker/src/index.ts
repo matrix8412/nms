@@ -23,7 +23,7 @@ const syncWorker = new Worker<DeviceSyncJobPayload>(
 const pingWorker = new Worker<DevicePingJobPayload>(
   DEVICE_PING_QUEUE,
   async (job) => {
-    await pingDevice(job.data.deviceId, job.data.ip, job.data.timeoutSec);
+    await pingDevice(job.data.deviceId, job.data.ip, job.data.timeoutSec, job.data.retries);
   },
   {
     connection,
