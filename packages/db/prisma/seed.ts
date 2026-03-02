@@ -75,8 +75,31 @@ async function seedRoles() {
   }
 }
 
+async function seedIntegrations() {
+  const icmpConfig = await prisma.integrationConfig.findUnique({
+    where: { provider: 'icmp' },
+  });
+  if (!icmpConfig) {
+    await prisma.integrationConfig.create({
+      data: {
+        provider: 'icmp',
+        enabled: true,
+        settings: {
+          intervalSec: 120,
+          timeoutSec: 3,
+          retries: 2,
+        },
+      },
+    });
+    console.log('Integration created: icmp (enabled)');
+  } else {
+    console.log('Integration already exists: icmp');
+  }
+}
+
 async function main() {
   await seedRoles();
+  await seedIntegrations();
 
   const existing = await prisma.user.findUnique({ where: { email: ADMIN_EMAIL } });
   if (existing) {

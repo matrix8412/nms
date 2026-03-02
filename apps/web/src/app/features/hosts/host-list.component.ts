@@ -1,5 +1,5 @@
 import { CommonModule } from '@angular/common';
-import { Component, inject, OnInit, signal, computed } from '@angular/core';
+import { Component, inject, OnInit, OnDestroy, signal, computed } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { Router, RouterLink } from '@angular/router';
 import { ApiService } from '../../core/http/api.service';
@@ -325,9 +325,11 @@ type SortDir = 'asc' | 'desc';
     `,
   ],
 })
-export class HostListComponent implements OnInit {
+export class HostListComponent implements OnInit, OnDestroy {
   private readonly api = inject(ApiService);
   private readonly router = inject(Router);
+  private pollTimer: ReturnType<typeof setInterval> | null = null;
+  private static readonly POLL_INTERVAL_MS = 30_000;
 
   protected filterName = '';
   protected filterIp = '';
@@ -361,8 +363,17 @@ export class HostListComponent implements OnInit {
 
   ngOnInit() {
     this.loadHosts();
+    this.pollTimer = setInterval(() => this.refreshHosts(), HostListComponent.POLL_INTERVAL_MS);
   }
 
+  ngOnDestroy() {
+    if (this.pollTimer) {
+      clearInterval(this.pollTimer);
+      this.pollTimer = null;
+    }
+  }
+
+  /** Full load (shows loading indicator) */
   private loadHosts() {
     this.loading.set(true);
     this.api.getDevices().subscribe({
@@ -373,6 +384,17 @@ export class HostListComponent implements OnInit {
         this.loading.set(false);
       },
       error: () => this.loading.set(false),
+    });
+  }
+
+  /** Silent refresh — updates data without showing the loading state */
+  private refreshHosts() {
+    this.api.getDevices().subscribe({
+      next: (res) => {
+        this.hosts.set(res.data);
+        this.extractTypes(res.data);
+        this.applyFilter();
+      },
     });
   }
 

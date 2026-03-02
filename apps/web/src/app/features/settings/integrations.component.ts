@@ -21,6 +21,17 @@ interface ModuleDef {
 
 const MODULES: ModuleDef[] = [
   {
+    provider: 'icmp',
+    label: 'ICMP Monitoring',
+    icon: 'network_ping',
+    description: 'Ping devices periodically to monitor availability (UP / DOWN)',
+    fields: [
+      { key: 'intervalSec', label: 'Ping Interval (seconds)', type: 'text' },
+      { key: 'timeoutSec', label: 'Timeout (seconds)', type: 'text' },
+      { key: 'retries', label: 'Retries per check', type: 'text' },
+    ],
+  },
+  {
     provider: 'zabbix',
     label: 'Zabbix',
     icon: 'monitoring',

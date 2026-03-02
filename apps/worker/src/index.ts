@@ -9,6 +9,8 @@ const logger = pino({ name: '@nms/worker' });
 
 const connection = { url: env.REDIS_URL };
 
+logger.info({ redisUrl: env.REDIS_URL }, 'Connecting to Redis');
+
 const syncWorker = new Worker<DeviceSyncJobPayload>(
   DEVICE_SYNC_QUEUE,
   async (job) => {
@@ -41,6 +43,13 @@ const commandWorker = new Worker(
     concurrency: 2,
   },
 );
+
+// Verify Redis connectivity
+pingWorker.waitUntilReady().then(() => {
+  logger.info('Redis connection established (ping worker ready)');
+}).catch((err) => {
+  logger.error({ err }, 'Redis connection FAILED — worker cannot process jobs');
+});
 
 syncWorker.on('completed', (job) => logger.info({ jobId: job.id }, 'device sync completed'));
 syncWorker.on('failed', (job, error) =>

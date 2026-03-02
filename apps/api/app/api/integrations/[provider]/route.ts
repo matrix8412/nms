@@ -20,9 +20,16 @@ export async function GET(request: NextRequest, { params }: Params) {
     await requireAdmin(request);
     const config = await prisma.integrationConfig.findUnique({ where: { provider } });
     if (!config) {
-      // Return default empty config
+      // Return sensible defaults per provider
+      const defaults: Record<string, { enabled: boolean; settings: Record<string, unknown> }> = {
+        icmp: {
+          enabled: true,
+          settings: { intervalSec: 120, timeoutSec: 3, retries: 2 },
+        },
+      };
+      const def = defaults[provider] ?? { enabled: false, settings: {} };
       return ok({
-        data: { provider, enabled: false, settings: {} },
+        data: { provider, enabled: def.enabled, settings: def.settings },
       });
     }
     return ok({ data: config });

@@ -6,6 +6,7 @@
       "outputs": ["dist/**", ".next/**", "apps/web/dist/**"]
     },
     "dev": {
+      "dependsOn": ["^build"],
       "cache": false,
       "persistent": true
     },

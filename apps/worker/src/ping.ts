@@ -45,15 +45,16 @@ export async function pingDevice(
   deviceId: string,
   ip: string,
   timeoutSec = 3,
-  retries = 1,
+  retries = 2,
 ) {
+  const totalAttempts = Math.max(retries, 1);
   let rtt: number | null = null;
 
-  for (let attempt = 1; attempt <= retries; attempt++) {
+  for (let attempt = 1; attempt <= totalAttempts; attempt++) {
     rtt = await pingHost(ip, timeoutSec);
     if (rtt !== null) break;
-    if (attempt < retries) {
-      logger.debug({ ip, attempt, retries }, 'ping retry');
+    if (attempt < totalAttempts) {
+      logger.debug({ ip, attempt, totalAttempts }, 'ping retry');
     }
   }
 
@@ -68,5 +69,5 @@ export async function pingDevice(
     },
   });
 
-  logger.debug({ deviceId, ip, isUp, rtt }, 'device ping result');
+  logger.info({ deviceId, ip, isUp, rtt }, 'device ping result');
 }

@@ -13,11 +13,21 @@ const env = z
   .parse(process.env);
 
 const logger = pino({ name: '@nms/scheduler' });
+
+logger.info({ redisUrl: env.REDIS_URL }, 'Connecting to Redis');
+
 const syncQueue = new Queue(DEVICE_SYNC_QUEUE, {
   connection: { url: env.REDIS_URL },
 });
 const pingQueue = new Queue(DEVICE_PING_QUEUE, {
   connection: { url: env.REDIS_URL },
+});
+
+// Verify Redis connectivity early
+pingQueue.waitUntilReady().then(() => {
+  logger.info('Redis connection established (ping queue ready)');
+}).catch((err) => {
+  logger.error({ err }, 'Redis connection FAILED — ping jobs will not be enqueued');
 });
 
 // ── ICMP settings helpers ──────────────────────────────────
@@ -33,7 +43,7 @@ const ICMP_DEFAULTS: IcmpSettings = {
   enabled: true,
   intervalSec: 120,
   timeoutSec: 3,
-  retries: 1,
+  retries: 2,
 };
 
 async function loadIcmpSettings(): Promise<IcmpSettings> {
@@ -42,6 +52,7 @@ async function loadIcmpSettings(): Promise<IcmpSettings> {
       where: { provider: 'icmp' },
     });
     if (!config) {
+      logger.debug('No ICMP integration config found – using defaults (enabled)');
       return ICMP_DEFAULTS;
     }
     if (!config.enabled) {
@@ -54,7 +65,8 @@ async function loadIcmpSettings(): Promise<IcmpSettings> {
       timeoutSec: typeof s['timeoutSec'] === 'number' ? s['timeoutSec'] : ICMP_DEFAULTS.timeoutSec,
       retries: typeof s['retries'] === 'number' ? s['retries'] : ICMP_DEFAULTS.retries,
     };
-  } catch {
+  } catch (err) {
+    logger.warn({ err }, 'Failed to load ICMP settings from DB – using defaults');
     return ICMP_DEFAULTS;
   }
 }
@@ -98,6 +110,11 @@ async function enqueuePingBatch() {
     select: { id: true, ip: true },
   });
 
+  if (devices.length === 0) {
+    logger.info('No devices found – skipping ping batch');
+    return;
+  }
+
   await Promise.all(
     devices.map((device: { id: string; ip: string }) =>
       pingQueue.add(
@@ -112,7 +129,7 @@ async function enqueuePingBatch() {
     ),
   );
 
-  logger.info({ count: devices.length, timeoutSec: icmp.timeoutSec }, 'Scheduled ping jobs enqueued');
+  logger.info({ count: devices.length, timeoutSec: icmp.timeoutSec, retries: icmp.retries }, 'Scheduled ping jobs enqueued');
 }
 
 // ── Cron schedules ─────────────────────────────────────────
