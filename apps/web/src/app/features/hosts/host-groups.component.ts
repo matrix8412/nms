@@ -1,7 +1,8 @@
-import { Component, inject, signal, computed, type OnInit } from '@angular/core';
+import { Component, computed, inject, input, signal, type OnInit } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { ApiService } from '../../core/http/api.service';
+import { ColumnFilterTriggerComponent } from '../../core/layout/column-filter-trigger.component';
 import { SlidePanelComponent } from '../../core/layout/slide-panel.component';
 
 interface DeviceGroup {
@@ -18,9 +19,9 @@ type SortDir = 'asc' | 'desc';
 @Component({
   selector: 'app-host-groups',
   standalone: true,
-  imports: [CommonModule, FormsModule, SlidePanelComponent],
+  imports: [CommonModule, FormsModule, SlidePanelComponent, ColumnFilterTriggerComponent],
   template: `
-    <div class="page-header">
+    <div class="page-header" *ngIf="!embedded()">
       <div>
         <h1>Host Groups</h1>
         <p class="subtitle">Organize hosts into logical groups</p>
@@ -31,32 +32,46 @@ type SortDir = 'asc' | 'desc';
     </div>
 
     <div class="table-card">
+      <div class="table-toolbar" *ngIf="embedded()">
+        <div style="flex: 1"></div>
+        <button class="btn btn-primary" (click)="openCreate()">
+          <span class="material-icons">add</span> New Group
+        </button>
+      </div>
       <table class="data-table" *ngIf="sorted().length; else emptyState">
         <thead>
           <tr>
-            <th class="sortable" (click)="toggleSort('name')">
-              Name
-              <span class="sort-icon material-icons">{{ getSortIcon('name') }}</span>
+            <th class="sortable">
+              <div class="header-cell">
+                <button type="button" class="header-sort" (click)="toggleSort('name')">
+                  Name
+                  <span class="sort-icon material-icons">{{ getSortIcon('name') }}</span>
+                </button>
+                <app-column-filter-trigger [active]="!!filterName()" label="Filter group name">
+                  <input type="text" class="th-filter" placeholder="Search..." [ngModel]="filterName()" (ngModelChange)="filterName.set($event)" />
+                </app-column-filter-trigger>
+              </div>
             </th>
-            <th class="sortable" (click)="toggleSort('description')">
-              Description
-              <span class="sort-icon material-icons">{{ getSortIcon('description') }}</span>
+            <th class="sortable">
+              <div class="header-cell">
+                <button type="button" class="header-sort" (click)="toggleSort('description')">
+                  Description
+                  <span class="sort-icon material-icons">{{ getSortIcon('description') }}</span>
+                </button>
+                <app-column-filter-trigger [active]="!!filterDesc()" label="Filter description">
+                  <input type="text" class="th-filter" placeholder="Search..." [ngModel]="filterDesc()" (ngModelChange)="filterDesc.set($event)" />
+                </app-column-filter-trigger>
+              </div>
             </th>
-            <th class="sortable" (click)="toggleSort('hosts')">
-              Hosts
-              <span class="sort-icon material-icons">{{ getSortIcon('hosts') }}</span>
+            <th class="sortable">
+              <div class="header-cell">
+                <button type="button" class="header-sort" (click)="toggleSort('hosts')">
+                  Hosts
+                  <span class="sort-icon material-icons">{{ getSortIcon('hosts') }}</span>
+                </button>
+              </div>
             </th>
             <th class="col-actions">Actions</th>
-          </tr>
-          <tr class="filter-row">
-            <th>
-              <input type="text" class="th-filter" placeholder="Search…" [ngModel]="filterName()" (ngModelChange)="filterName.set($event)" />
-            </th>
-            <th>
-              <input type="text" class="th-filter" placeholder="Search…" [ngModel]="filterDesc()" (ngModelChange)="filterDesc.set($event)" />
-            </th>
-            <th></th>
-            <th></th>
           </tr>
         </thead>
         <tbody>
@@ -131,14 +146,17 @@ type SortDir = 'asc' | 'desc';
     .btn .material-icons { font-size: 18px; }
 
     .table-card { background: #fff; border-radius: 14px; box-shadow: 0 1px 4px rgba(0,0,0,.06); overflow: hidden; }
+    .table-toolbar { display: flex; padding: 14px 20px; border-bottom: 1px solid #e2e8f0; gap: 12px; align-items: center; }
 
     .data-table { width: 100%; border-collapse: collapse; }
     .data-table th { text-align: left; padding: 10px 20px; font-size: 0.78rem; text-transform: uppercase; letter-spacing: 0.5px; color: #94a3b8; font-weight: 600; border-bottom: 1px solid #e2e8f0; background: #f8fafc; }
     .data-table th.sortable { cursor: pointer; user-select: none; white-space: nowrap; }
     .data-table th.sortable:hover { color: #334155; }
+    .header-cell { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+    .header-sort { display: inline-flex; align-items: center; gap: 2px; padding: 0; border: none; background: none; color: inherit; font: inherit; text-transform: inherit; letter-spacing: inherit; cursor: pointer; }
+    .header-sort:hover { color: #334155; }
     .sort-icon { font-size: 14px; vertical-align: middle; margin-left: 2px; color: #c0c8d4; }
-    .data-table th.sortable:hover .sort-icon { color: #64748b; }
-    .filter-row th { padding: 6px 20px 10px; background: #f8fafc; border-bottom: 2px solid #e2e8f0; }
+    .data-table th.sortable:hover .sort-icon, .header-sort:hover .sort-icon { color: #64748b; }
     .th-filter { width: 100%; padding: 6px 10px; border: 1px solid #e2e8f0; border-radius: 6px; font-size: 0.82rem; font-family: inherit; background: #fff; outline: none; color: #334155; box-sizing: border-box; }
     .th-filter:focus { border-color: #3b82f6; box-shadow: 0 0 0 2px rgba(59,130,246,.1); }
     .data-table td { padding: 12px 20px; font-size: 0.88rem; color: #334155; border-bottom: 1px solid #f1f5f9; }
@@ -170,6 +188,8 @@ type SortDir = 'asc' | 'desc';
 })
 export class HostGroupsComponent implements OnInit {
   private readonly api = inject(ApiService);
+
+  readonly embedded = input(false);
 
   protected readonly groups = signal<DeviceGroup[]>([]);
   protected readonly filterName = signal('');

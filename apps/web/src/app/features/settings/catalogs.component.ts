@@ -1,8 +1,11 @@
-import { Component, inject, signal, computed, type OnInit } from '@angular/core';
+import { Component, computed, inject, signal, type OnInit } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
+import { ActivatedRoute, Router } from '@angular/router';
 import { ApiService } from '../../core/http/api.service';
+import { ColumnFilterTriggerComponent } from '../../core/layout/column-filter-trigger.component';
 import { SlidePanelComponent } from '../../core/layout/slide-panel.component';
+import { HostGroupsComponent } from '../hosts/host-groups.component';
 
 interface CatalogItem { id: string; name: string; createdAt: string; }
 
@@ -12,27 +15,32 @@ type SortDir = 'asc' | 'desc';
 @Component({
   selector: 'app-catalogs',
   standalone: true,
-  imports: [CommonModule, FormsModule, SlidePanelComponent],
+  imports: [CommonModule, FormsModule, SlidePanelComponent, HostGroupsComponent, ColumnFilterTriggerComponent],
   template: `
     <div class="page-header">
       <div>
         <h1>Catalogs</h1>
-        <p class="subtitle">Manage vendors and device types</p>
+        <p class="subtitle">Manage vendors, device types, and host groups</p>
       </div>
     </div>
 
     <!-- Tab bar -->
     <div class="tab-bar">
-      <button class="tab" [class.active]="activeTab() === 'vendors'" (click)="activeTab.set('vendors')">
+      <button class="tab" [class.active]="activeTab() === 'vendors'" (click)="selectTab('vendors')">
         <span class="material-icons">business</span> Vendors
       </button>
-      <button class="tab" [class.active]="activeTab() === 'device-types'" (click)="activeTab.set('device-types')">
+      <button class="tab" [class.active]="activeTab() === 'device-types'" (click)="selectTab('device-types')">
         <span class="material-icons">devices_other</span> Device Types
+      </button>
+      <button class="tab" [class.active]="activeTab() === 'host-groups'" (click)="selectTab('host-groups')">
+        <span class="material-icons">folder</span> Host Groups
       </button>
     </div>
 
     <!-- Content -->
-    <div class="table-card">
+    <app-host-groups *ngIf="activeTab() === 'host-groups'" [embedded]="true" />
+
+    <div class="table-card" *ngIf="activeTab() !== 'host-groups'">
       <div class="table-toolbar">
         <div style="flex:1"></div>
         <button class="btn btn-primary" (click)="openCreate()">
@@ -43,22 +51,26 @@ type SortDir = 'asc' | 'desc';
       <table class="data-table" *ngIf="sortedItems().length; else emptyState">
         <thead>
           <tr>
-            <th class="sortable" (click)="toggleSort('name')">
-              Name
-              <span class="sort-icon material-icons">{{ getSortIcon('name') }}</span>
+            <th class="sortable">
+              <div class="header-cell">
+                <button type="button" class="header-sort" (click)="toggleSort('name')">
+                  Name
+                  <span class="sort-icon material-icons">{{ getSortIcon('name') }}</span>
+                </button>
+                <app-column-filter-trigger [active]="!!searchQuery()" label="Filter name">
+                  <input type="text" class="th-filter" placeholder="Search..." [ngModel]="searchQuery()" (ngModelChange)="searchQuery.set($event)" />
+                </app-column-filter-trigger>
+              </div>
             </th>
-            <th class="sortable" (click)="toggleSort('createdAt')">
-              Created
-              <span class="sort-icon material-icons">{{ getSortIcon('createdAt') }}</span>
+            <th class="sortable">
+              <div class="header-cell">
+                <button type="button" class="header-sort" (click)="toggleSort('createdAt')">
+                  Created
+                  <span class="sort-icon material-icons">{{ getSortIcon('createdAt') }}</span>
+                </button>
+              </div>
             </th>
             <th class="col-actions">Actions</th>
-          </tr>
-          <tr class="filter-row">
-            <th>
-              <input type="text" class="th-filter" placeholder="Search…" [ngModel]="searchQuery()" (ngModelChange)="searchQuery.set($event)" />
-            </th>
-            <th></th>
-            <th></th>
           </tr>
         </thead>
         <tbody>
@@ -141,9 +153,11 @@ type SortDir = 'asc' | 'desc';
     .data-table th { text-align: left; padding: 10px 20px; font-size: 0.78rem; text-transform: uppercase; letter-spacing: 0.5px; color: #94a3b8; font-weight: 600; border-bottom: 1px solid #e2e8f0; background: #f8fafc; }
     .data-table th.sortable { cursor: pointer; user-select: none; white-space: nowrap; }
     .data-table th.sortable:hover { color: #334155; }
+    .header-cell { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+    .header-sort { display: inline-flex; align-items: center; gap: 2px; padding: 0; border: none; background: none; color: inherit; font: inherit; text-transform: inherit; letter-spacing: inherit; cursor: pointer; }
+    .header-sort:hover { color: #334155; }
     .sort-icon { font-size: 14px; vertical-align: middle; margin-left: 2px; color: #c0c8d4; }
-    .data-table th.sortable:hover .sort-icon { color: #64748b; }
-    .filter-row th { padding: 6px 20px 10px; background: #f8fafc; border-bottom: 2px solid #e2e8f0; }
+    .data-table th.sortable:hover .sort-icon, .header-sort:hover .sort-icon { color: #64748b; }
     .th-filter { width: 100%; padding: 6px 10px; border: 1px solid #e2e8f0; border-radius: 6px; font-size: 0.82rem; font-family: inherit; background: #fff; outline: none; color: #334155; box-sizing: border-box; }
     .th-filter:focus { border-color: #3b82f6; box-shadow: 0 0 0 2px rgba(59,130,246,.1); }
     .data-table td { padding: 12px 20px; font-size: 0.88rem; color: #334155; border-bottom: 1px solid #f1f5f9; }
@@ -175,8 +189,10 @@ type SortDir = 'asc' | 'desc';
 })
 export class CatalogsComponent implements OnInit {
   private readonly api = inject(ApiService);
+  private readonly router = inject(Router);
+  private readonly route = inject(ActivatedRoute);
 
-  protected readonly activeTab = signal<'vendors' | 'device-types'>('vendors');
+  protected readonly activeTab = signal<'vendors' | 'device-types' | 'host-groups'>('vendors');
   protected readonly vendors = signal<CatalogItem[]>([]);
   protected readonly deviceTypes = signal<CatalogItem[]>([]);
   protected readonly searchQuery = signal('');
@@ -222,7 +238,29 @@ export class CatalogsComponent implements OnInit {
   }
 
   ngOnInit() {
+    this.activeTab.set(this.resolveInitialTab());
     this.loadAll();
+  }
+
+  protected selectTab(tab: 'vendors' | 'device-types' | 'host-groups') {
+    this.activeTab.set(tab);
+    void this.router.navigate(['/settings/catalogs'], {
+      queryParams: { tab },
+      queryParamsHandling: 'merge',
+    });
+  }
+
+  private resolveInitialTab(): 'vendors' | 'device-types' | 'host-groups' {
+    const tab = this.route.snapshot.queryParamMap.get('tab');
+    if (tab === 'vendors' || tab === 'device-types' || tab === 'host-groups') {
+      return tab;
+    }
+
+    if (this.router.url.includes('/settings/host-groups')) {
+      return 'host-groups';
+    }
+
+    return 'vendors';
   }
 
   private loadAll() {

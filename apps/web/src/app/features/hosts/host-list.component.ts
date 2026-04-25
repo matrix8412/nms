@@ -3,7 +3,10 @@ import { Component, inject, OnInit, OnDestroy, signal, computed } from '@angular
 import { FormsModule } from '@angular/forms';
 import { Router, RouterLink } from '@angular/router';
 import { ApiService } from '../../core/http/api.service';
+import { ColumnFilterTriggerComponent } from '../../core/layout/column-filter-trigger.component';
 import { SlidePanelComponent } from '../../core/layout/slide-panel.component';
+import { SearchableSelectComponent, type SearchableSelectOption } from '../../core/layout/searchable-select.component';
+import { matchesSearchText, normalizeSearchText } from '../../core/utils/search.util';
 import { HostFormComponent } from './host-form.component';
 import type { DeviceDto } from '@nms/shared';
 
@@ -13,7 +16,7 @@ type SortDir = 'asc' | 'desc';
 @Component({
   selector: 'app-host-list',
   standalone: true,
-  imports: [CommonModule, FormsModule, RouterLink, SlidePanelComponent, HostFormComponent],
+  imports: [CommonModule, FormsModule, RouterLink, SlidePanelComponent, HostFormComponent, SearchableSelectComponent, ColumnFilterTriggerComponent],
   template: `
     <div class="page-header">
       <div>
@@ -32,58 +35,90 @@ type SortDir = 'asc' | 'desc';
         <table>
           <thead>
             <tr>
-              <th class="sortable status-col" (click)="toggleSort('icmpStatus')">
-                Status
-                <span class="sort-icon material-icons">{{ getSortIcon('icmpStatus') }}</span>
+              <th class="sortable status-col">
+                <div class="header-cell">
+                  <button type="button" class="header-sort" (click)="toggleSort('icmpStatus')">
+                    Status
+                    <span class="sort-icon material-icons">{{ getSortIcon('icmpStatus') }}</span>
+                  </button>
+                  <app-column-filter-trigger [active]="!!filterStatus" label="Filter status">
+                    <app-searchable-select
+                      [(ngModel)]="filterStatus"
+                      (ngModelChange)="applyFilter()"
+                      [ngModelOptions]="{ standalone: true }"
+                      [options]="statusOptions"
+                      placeholder="All"
+                      searchPlaceholder="Search status"
+                      emptyOptionLabel="All"
+                      emptyStateLabel="No matching statuses"
+                      [compact]="true"
+                    />
+                  </app-column-filter-trigger>
+                </div>
               </th>
-              <th class="sortable" (click)="toggleSort('name')">
-                Name
-                <span class="sort-icon material-icons">{{ getSortIcon('name') }}</span>
+              <th class="sortable">
+                <div class="header-cell">
+                  <button type="button" class="header-sort" (click)="toggleSort('name')">
+                    Name
+                    <span class="sort-icon material-icons">{{ getSortIcon('name') }}</span>
+                  </button>
+                  <app-column-filter-trigger [active]="!!filterName" label="Filter name">
+                    <input type="text" class="th-filter" placeholder="Search..." [(ngModel)]="filterName" (ngModelChange)="applyFilter()" />
+                  </app-column-filter-trigger>
+                </div>
               </th>
-              <th class="sortable" (click)="toggleSort('ip')">
-                IP Address
-                <span class="sort-icon material-icons">{{ getSortIcon('ip') }}</span>
+              <th class="sortable">
+                <div class="header-cell">
+                  <button type="button" class="header-sort" (click)="toggleSort('ip')">
+                    IP Address
+                    <span class="sort-icon material-icons">{{ getSortIcon('ip') }}</span>
+                  </button>
+                  <app-column-filter-trigger [active]="!!filterIp" label="Filter IP address">
+                    <input type="text" class="th-filter" placeholder="Search..." [(ngModel)]="filterIp" (ngModelChange)="applyFilter()" />
+                  </app-column-filter-trigger>
+                </div>
               </th>
-              <th class="sortable" (click)="toggleSort('vendor')">
-                Vendor
-                <span class="sort-icon material-icons">{{ getSortIcon('vendor') }}</span>
+              <th class="sortable">
+                <div class="header-cell">
+                  <button type="button" class="header-sort" (click)="toggleSort('vendor')">
+                    Vendor
+                    <span class="sort-icon material-icons">{{ getSortIcon('vendor') }}</span>
+                  </button>
+                  <app-column-filter-trigger [active]="!!filterVendor" label="Filter vendor">
+                    <input type="text" class="th-filter" placeholder="Search..." [(ngModel)]="filterVendor" (ngModelChange)="applyFilter()" />
+                  </app-column-filter-trigger>
+                </div>
               </th>
-              <th class="sortable" (click)="toggleSort('type')">
-                Type
-                <span class="sort-icon material-icons">{{ getSortIcon('type') }}</span>
+              <th class="sortable">
+                <div class="header-cell">
+                  <button type="button" class="header-sort" (click)="toggleSort('type')">
+                    Type
+                    <span class="sort-icon material-icons">{{ getSortIcon('type') }}</span>
+                  </button>
+                  <app-column-filter-trigger [active]="!!filterType" label="Filter type">
+                    <app-searchable-select
+                      [(ngModel)]="filterType"
+                      (ngModelChange)="applyFilter()"
+                      [ngModelOptions]="{ standalone: true }"
+                      [options]="typeOptions()"
+                      placeholder="All"
+                      searchPlaceholder="Search type"
+                      emptyOptionLabel="All"
+                      emptyStateLabel="No matching device types"
+                      [compact]="true"
+                    />
+                  </app-column-filter-trigger>
+                </div>
               </th>
-              <th class="sortable" (click)="toggleSort('zabbixHostId')">
-                Zabbix ID
-                <span class="sort-icon material-icons">{{ getSortIcon('zabbixHostId') }}</span>
+              <th class="sortable">
+                <div class="header-cell">
+                  <button type="button" class="header-sort" (click)="toggleSort('zabbixHostId')">
+                    Zabbix ID
+                    <span class="sort-icon material-icons">{{ getSortIcon('zabbixHostId') }}</span>
+                  </button>
+                </div>
               </th>
               <th class="actions-col">Actions</th>
-            </tr>
-            <tr class="filter-row">
-              <th>
-                <select class="th-filter" [(ngModel)]="filterStatus" (ngModelChange)="applyFilter()">
-                  <option value="">All</option>
-                  <option value="UP">Up</option>
-                  <option value="DOWN">Down</option>
-                  <option value="UNKNOWN">Unknown</option>
-                </select>
-              </th>
-              <th>
-                <input type="text" class="th-filter" placeholder="Search…" [(ngModel)]="filterName" (ngModelChange)="applyFilter()" />
-              </th>
-              <th>
-                <input type="text" class="th-filter" placeholder="Search…" [(ngModel)]="filterIp" (ngModelChange)="applyFilter()" />
-              </th>
-              <th>
-                <input type="text" class="th-filter" placeholder="Search…" [(ngModel)]="filterVendor" (ngModelChange)="applyFilter()" />
-              </th>
-              <th>
-                <select class="th-filter" [(ngModel)]="filterType" (ngModelChange)="applyFilter()">
-                  <option value="">All</option>
-                  <option *ngFor="let t of availableTypes()" [value]="t">{{ t }}</option>
-                </select>
-              </th>
-              <th></th>
-              <th></th>
             </tr>
           </thead>
           <tbody>
@@ -217,14 +252,23 @@ type SortDir = 'asc' | 'desc';
       }
       th.sortable { cursor: pointer; user-select: none; white-space: nowrap; }
       th.sortable:hover { color: #334155; }
-      .sort-icon { font-size: 14px; vertical-align: middle; margin-left: 2px; color: #94a3b8; }
-      th.sortable:hover .sort-icon { color: #64748b; }
-
-      .filter-row th {
-        padding: 6px 16px 10px;
-        background: #f8fafc;
-        border-bottom: 2px solid #e2e8f0;
+      .header-cell { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+      .header-sort {
+        display: inline-flex;
+        align-items: center;
+        gap: 2px;
+        padding: 0;
+        border: none;
+        background: none;
+        color: inherit;
+        font: inherit;
+        text-transform: inherit;
+        letter-spacing: inherit;
+        cursor: pointer;
       }
+      .header-sort:hover { color: #334155; }
+      .sort-icon { font-size: 14px; vertical-align: middle; margin-left: 2px; color: #94a3b8; }
+      th.sortable:hover .sort-icon, .header-sort:hover .sort-icon { color: #64748b; }
       .th-filter {
         width: 100%;
         padding: 6px 10px;
@@ -238,7 +282,6 @@ type SortDir = 'asc' | 'desc';
         box-sizing: border-box;
       }
       .th-filter:focus { border-color: #3b82f6; box-shadow: 0 0 0 2px rgba(59,130,246,0.1); }
-      select.th-filter { cursor: pointer; }
 
       /* Status indicators */
       .status-col { width: 90px; text-align: center; }
@@ -330,6 +373,11 @@ export class HostListComponent implements OnInit, OnDestroy {
   private readonly router = inject(Router);
   private pollTimer: ReturnType<typeof setInterval> | null = null;
   private static readonly POLL_INTERVAL_MS = 30_000;
+  protected readonly statusOptions: SearchableSelectOption[] = [
+    { value: 'UP', label: 'Up' },
+    { value: 'DOWN', label: 'Down' },
+    { value: 'UNKNOWN', label: 'Unknown' },
+  ];
 
   protected filterName = '';
   protected filterIp = '';
@@ -344,6 +392,9 @@ export class HostListComponent implements OnInit, OnDestroy {
 
   protected readonly availableTypes = signal<string[]>([]);
   protected readonly filteredHosts = signal<DeviceDto[]>([]);
+  protected readonly typeOptions = computed<SearchableSelectOption[]>(() =>
+    this.availableTypes().map((type) => ({ value: type, label: type })),
+  );
 
   protected readonly sortField = signal<SortField | ''>('');
   protected readonly sortDir = signal<SortDir>('asc');
@@ -407,17 +458,17 @@ export class HostListComponent implements OnInit, OnDestroy {
   }
 
   protected applyFilter() {
-    const name = this.filterName.toLowerCase();
-    const ip = this.filterIp.toLowerCase();
-    const vendor = this.filterVendor.toLowerCase();
-    const type = this.filterType;
+    const name = normalizeSearchText(this.filterName);
+    const ip = normalizeSearchText(this.filterIp);
+    const vendor = normalizeSearchText(this.filterVendor);
+    const type = normalizeSearchText(this.filterType);
     const status = this.filterStatus;
     this.filteredHosts.set(
       this.hosts().filter((h) =>
-        (!name || (h.name ?? '').toLowerCase().includes(name)) &&
-        (!ip || (h.ip ?? '').toLowerCase().includes(ip)) &&
-        (!vendor || (h.vendor ?? '').toLowerCase().includes(vendor)) &&
-        (!type || h.type === type) &&
+        matchesSearchText(h.name, name) &&
+        matchesSearchText(h.ip, ip) &&
+        matchesSearchText(h.vendor, vendor) &&
+        matchesSearchText(h.type, type) &&
         (!status || h.icmpStatus === status)
       ),
     );

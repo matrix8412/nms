@@ -380,12 +380,11 @@ export class AppShellComponent {
       children: [
         { label: 'General', route: '/settings', icon: 'tune' },
         { label: 'Users', route: '/settings/users', icon: 'people' },
+        { label: 'Roles', route: '/settings/roles', icon: 'admin_panel_settings' },        
         { label: 'Audit Logs', route: '/settings/audit-logs', icon: 'history' },
-        { label: 'Roles', route: '/settings/roles', icon: 'admin_panel_settings' },
         { label: 'Integrations', route: '/settings/integrations', icon: 'extension' },
         { label: 'Plugins', route: '/settings/plugins', icon: 'power' },
         { label: 'Catalogs', route: '/settings/catalogs', icon: 'inventory_2' },
-        { label: 'Host Groups', route: '/settings/host-groups', icon: 'folder' },
       ],
     },
   ];

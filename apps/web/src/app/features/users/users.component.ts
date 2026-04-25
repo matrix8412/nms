@@ -2,7 +2,9 @@ import { CommonModule } from '@angular/common';
 import { Component, inject, OnInit, signal, computed } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { ApiService } from '../../core/http/api.service';
+import { ColumnFilterTriggerComponent } from '../../core/layout/column-filter-trigger.component';
 import { SlidePanelComponent } from '../../core/layout/slide-panel.component';
+import { SearchableSelectComponent, type SearchableSelectOption } from '../../core/layout/searchable-select.component';
 
 interface UserEntry {
   id: string;
@@ -25,7 +27,7 @@ interface RoleEntry {
 @Component({
   selector: 'app-users',
   standalone: true,
-  imports: [CommonModule, FormsModule, SlidePanelComponent],
+  imports: [CommonModule, FormsModule, SlidePanelComponent, SearchableSelectComponent, ColumnFilterTriggerComponent],
   template: `
     <div class="page-header">
       <div>
@@ -39,43 +41,68 @@ interface RoleEntry {
         <table>
           <thead>
             <tr>
-              <th class="sortable" (click)="toggleSort('email')">
-                Email
-                <span class="sort-icon material-icons">{{ getSortIcon('email') }}</span>
+              <th class="sortable">
+                <div class="header-cell">
+                  <button type="button" class="header-sort" (click)="toggleSort('email')">
+                    Email
+                    <span class="sort-icon material-icons">{{ getSortIcon('email') }}</span>
+                  </button>
+                  <app-column-filter-trigger [active]="!!filterEmail" label="Filter email">
+                    <input type="text" class="th-filter" placeholder="Search..." [(ngModel)]="filterEmail" (ngModelChange)="applyFilter()" />
+                  </app-column-filter-trigger>
+                </div>
               </th>
-              <th class="sortable" (click)="toggleSort('role')">
-                Role
-                <span class="sort-icon material-icons">{{ getSortIcon('role') }}</span>
+              <th class="sortable">
+                <div class="header-cell">
+                  <button type="button" class="header-sort" (click)="toggleSort('role')">
+                    Role
+                    <span class="sort-icon material-icons">{{ getSortIcon('role') }}</span>
+                  </button>
+                  <app-column-filter-trigger [active]="!!filterRole" label="Filter role">
+                    <app-searchable-select
+                      [(ngModel)]="filterRole"
+                      (ngModelChange)="applyFilter()"
+                      [ngModelOptions]="{ standalone: true }"
+                      [options]="roleFilterOptions()"
+                      placeholder="All"
+                      searchPlaceholder="Search role"
+                      emptyOptionLabel="All"
+                      emptyStateLabel="No matching roles"
+                      [compact]="true"
+                    />
+                  </app-column-filter-trigger>
+                </div>
               </th>
-              <th class="sortable" (click)="toggleSort('emailVerifiedAt')">
-                Verified
-                <span class="sort-icon material-icons">{{ getSortIcon('emailVerifiedAt') }}</span>
+              <th class="sortable">
+                <div class="header-cell">
+                  <button type="button" class="header-sort" (click)="toggleSort('emailVerifiedAt')">
+                    Verified
+                    <span class="sort-icon material-icons">{{ getSortIcon('emailVerifiedAt') }}</span>
+                  </button>
+                  <app-column-filter-trigger [active]="!!filterVerified" label="Filter verification state">
+                    <app-searchable-select
+                      [(ngModel)]="filterVerified"
+                      (ngModelChange)="applyFilter()"
+                      [ngModelOptions]="{ standalone: true }"
+                      [options]="verifiedOptions"
+                      placeholder="All"
+                      searchPlaceholder="Search verification"
+                      emptyOptionLabel="All"
+                      emptyStateLabel="No matching states"
+                      [compact]="true"
+                    />
+                  </app-column-filter-trigger>
+                </div>
               </th>
-              <th class="sortable" (click)="toggleSort('createdAt')">
-                Created
-                <span class="sort-icon material-icons">{{ getSortIcon('createdAt') }}</span>
+              <th class="sortable">
+                <div class="header-cell">
+                  <button type="button" class="header-sort" (click)="toggleSort('createdAt')">
+                    Created
+                    <span class="sort-icon material-icons">{{ getSortIcon('createdAt') }}</span>
+                  </button>
+                </div>
               </th>
               <th class="actions-col">Actions</th>
-            </tr>
-            <tr class="filter-row">
-              <th>
-                <input type="text" class="th-filter" placeholder="Search…" [(ngModel)]="filterEmail" (ngModelChange)="applyFilter()" />
-              </th>
-              <th>
-                <select class="th-filter" [(ngModel)]="filterRole" (ngModelChange)="applyFilter()">
-                  <option value="">All</option>
-                  <option *ngFor="let r of availableRoles()" [value]="r">{{ r }}</option>
-                </select>
-              </th>
-              <th>
-                <select class="th-filter" [(ngModel)]="filterVerified" (ngModelChange)="applyFilter()">
-                  <option value="">All</option>
-                  <option value="yes">Verified</option>
-                  <option value="no">Not verified</option>
-                </select>
-              </th>
-              <th></th>
-              <th></th>
             </tr>
           </thead>
           <tbody>
@@ -123,9 +150,17 @@ interface RoleEntry {
 
         <div class="form-group">
           <label>Role</label>
-          <select [(ngModel)]="editRole" class="select-input">
-            <option *ngFor="let role of roles()" [value]="role.name">{{ role.name }}</option>
-          </select>
+          <app-searchable-select
+            [(ngModel)]="editRole"
+            [ngModelOptions]="{ standalone: true }"
+            [options]="roleEditorOptions()"
+            placeholder="Select role"
+            searchPlaceholder="Search role"
+            emptyOptionLabel="No role"
+            emptyStateLabel="No matching roles"
+            [allowEmpty]="false"
+            metaText="Choose the role assigned to this user"
+          />
         </div>
 
         <div class="form-error" *ngIf="error()">{{ error() }}</div>
@@ -166,12 +201,13 @@ interface RoleEntry {
       }
       th.sortable { cursor: pointer; user-select: none; white-space: nowrap; }
       th.sortable:hover { color: #334155; }
+      .header-cell { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+      .header-sort { display: inline-flex; align-items: center; gap: 2px; padding: 0; border: none; background: none; color: inherit; font: inherit; text-transform: inherit; letter-spacing: inherit; cursor: pointer; }
+      .header-sort:hover { color: #334155; }
       .sort-icon { font-size: 14px; vertical-align: middle; margin-left: 2px; color: #94a3b8; }
-      th.sortable:hover .sort-icon { color: #64748b; }
-      .filter-row th { padding: 6px 16px 10px; background: #f8fafc; border-bottom: 2px solid #e2e8f0; }
+      th.sortable:hover .sort-icon, .header-sort:hover .sort-icon { color: #64748b; }
       .th-filter { width: 100%; padding: 6px 10px; border: 1px solid #e2e8f0; border-radius: 6px; font-size: 0.82rem; font-family: inherit; background: #fff; outline: none; color: #334155; box-sizing: border-box; }
       .th-filter:focus { border-color: #3b82f6; box-shadow: 0 0 0 2px rgba(59,130,246,0.1); }
-      select.th-filter { cursor: pointer; }
 
       td {
         padding: 12px 16px;
@@ -262,6 +298,10 @@ interface RoleEntry {
 })
 export class UsersComponent implements OnInit {
   private readonly api = inject(ApiService);
+  protected readonly verifiedOptions: SearchableSelectOption[] = [
+    { value: 'yes', label: 'Verified' },
+    { value: 'no', label: 'Not verified' },
+  ];
 
   protected editRole = 'USER';
   protected filterEmail = '';
@@ -278,6 +318,12 @@ export class UsersComponent implements OnInit {
   protected readonly editingUser = signal<UserEntry | null>(null);
   protected readonly submitting = signal(false);
   protected readonly error = signal('');
+  protected readonly roleFilterOptions = computed<SearchableSelectOption[]>(() =>
+    this.availableRoles().map((role) => ({ value: role, label: role })),
+  );
+  protected readonly roleEditorOptions = computed<SearchableSelectOption[]>(() =>
+    this.roles().map((role) => ({ value: role.name, label: role.name, description: role.description })),
+  );
 
   protected readonly sortedUsers = computed(() => {
     const items = this.filteredUsers();

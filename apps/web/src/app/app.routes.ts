@@ -10,7 +10,6 @@ import { ResetPasswordPageComponent } from './features/auth/reset-password-page.
 import { UserDashboardComponent } from './features/dashboard/user-dashboard.component';
 import { HostListComponent } from './features/hosts/host-list.component';
 import { HostDetailComponent } from './features/hosts/host-detail.component';
-import { HostGroupsComponent } from './features/hosts/host-groups.component';
 import { EventsComponent } from './features/events/events.component';
 import { AuditLogsComponent } from './features/audit-logs/audit-logs.component';
 import { UsersComponent } from './features/users/users.component';
@@ -60,7 +59,7 @@ export const routes: Routes = [
       { path: 'settings/integrations', component: IntegrationsComponent, canActivate: [adminGuard] },
       { path: 'settings/plugins', component: PluginsComponent, canActivate: [adminGuard] },
       { path: 'settings/catalogs', component: CatalogsComponent, canActivate: [adminGuard] },
-      { path: 'settings/host-groups', component: HostGroupsComponent, canActivate: [adminGuard] },
+      { path: 'settings/host-groups', component: CatalogsComponent, canActivate: [adminGuard] },
 
       // Legacy redirects
       { path: 'devices', redirectTo: 'hosts', pathMatch: 'full' },

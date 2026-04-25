@@ -2,6 +2,8 @@ import { CommonModule } from '@angular/common';
 import { Component, inject, OnInit, signal, computed } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { ApiService } from '../../core/http/api.service';
+import { ColumnFilterTriggerComponent } from '../../core/layout/column-filter-trigger.component';
+import { SearchableSelectComponent, type SearchableSelectOption } from '../../core/layout/searchable-select.component';
 
 interface AuditEntry {
   id: string;
@@ -19,7 +21,7 @@ type SortDir = 'asc' | 'desc';
 @Component({
   selector: 'app-audit-logs',
   standalone: true,
-  imports: [CommonModule, FormsModule],
+  imports: [CommonModule, FormsModule, SearchableSelectComponent, ColumnFilterTriggerComponent],
   template: `
     <div class="page-header">
       <div>
@@ -33,37 +35,57 @@ type SortDir = 'asc' | 'desc';
         <table>
           <thead>
             <tr>
-              <th class="sortable" (click)="toggleSort('action')">
-                Action
-                <span class="sort-icon material-icons">{{ getSortIcon('action') }}</span>
+              <th class="sortable">
+                <div class="header-cell">
+                  <button type="button" class="header-sort" (click)="toggleSort('action')">
+                    Action
+                    <span class="sort-icon material-icons">{{ getSortIcon('action') }}</span>
+                  </button>
+                  <app-column-filter-trigger [active]="!!actionFilter" label="Filter action">
+                    <app-searchable-select
+                      [(ngModel)]="actionFilter"
+                      (ngModelChange)="applyFilter()"
+                      [ngModelOptions]="{ standalone: true }"
+                      [options]="actionOptions()"
+                      placeholder="All"
+                      searchPlaceholder="Search action"
+                      emptyOptionLabel="All"
+                      emptyStateLabel="No matching actions"
+                      [compact]="true"
+                    />
+                  </app-column-filter-trigger>
+                </div>
               </th>
-              <th class="sortable" (click)="toggleSort('userEmail')">
-                User
-                <span class="sort-icon material-icons">{{ getSortIcon('userEmail') }}</span>
+              <th class="sortable">
+                <div class="header-cell">
+                  <button type="button" class="header-sort" (click)="toggleSort('userEmail')">
+                    User
+                    <span class="sort-icon material-icons">{{ getSortIcon('userEmail') }}</span>
+                  </button>
+                  <app-column-filter-trigger [active]="!!userFilter" label="Filter user">
+                    <input type="text" class="th-filter" placeholder="Search..." [(ngModel)]="userFilter" (ngModelChange)="applyFilter()" />
+                  </app-column-filter-trigger>
+                </div>
               </th>
-              <th class="sortable" (click)="toggleSort('ip')">
-                IP Address
-                <span class="sort-icon material-icons">{{ getSortIcon('ip') }}</span>
+              <th class="sortable">
+                <div class="header-cell">
+                  <button type="button" class="header-sort" (click)="toggleSort('ip')">
+                    IP Address
+                    <span class="sort-icon material-icons">{{ getSortIcon('ip') }}</span>
+                  </button>
+                  <app-column-filter-trigger [active]="!!ipFilter" label="Filter IP address">
+                    <input type="text" class="th-filter" placeholder="Search..." [(ngModel)]="ipFilter" (ngModelChange)="applyFilter()" />
+                  </app-column-filter-trigger>
+                </div>
               </th>
-              <th class="sortable" (click)="toggleSort('createdAt')">
-                Timestamp
-                <span class="sort-icon material-icons">{{ getSortIcon('createdAt') }}</span>
+              <th class="sortable">
+                <div class="header-cell">
+                  <button type="button" class="header-sort" (click)="toggleSort('createdAt')">
+                    Timestamp
+                    <span class="sort-icon material-icons">{{ getSortIcon('createdAt') }}</span>
+                  </button>
+                </div>
               </th>
-            </tr>
-            <tr class="filter-row">
-              <th>
-                <select class="th-filter" [(ngModel)]="actionFilter" (ngModelChange)="applyFilter()">
-                  <option value="">All</option>
-                  <option *ngFor="let a of actionTypes()" [value]="a">{{ a }}</option>
-                </select>
-              </th>
-              <th>
-                <input type="text" class="th-filter" placeholder="Search…" [(ngModel)]="userFilter" (ngModelChange)="applyFilter()" />
-              </th>
-              <th>
-                <input type="text" class="th-filter" placeholder="Search…" [(ngModel)]="ipFilter" (ngModelChange)="applyFilter()" />
-              </th>
-              <th></th>
             </tr>
           </thead>
           <tbody>
@@ -123,12 +145,13 @@ type SortDir = 'asc' | 'desc';
       }
       th.sortable { cursor: pointer; user-select: none; white-space: nowrap; }
       th.sortable:hover { color: #334155; }
+      .header-cell { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+      .header-sort { display: inline-flex; align-items: center; gap: 2px; padding: 0; border: none; background: none; color: inherit; font: inherit; text-transform: inherit; letter-spacing: inherit; cursor: pointer; }
+      .header-sort:hover { color: #334155; }
       .sort-icon { font-size: 14px; vertical-align: middle; margin-left: 2px; color: #94a3b8; }
-      th.sortable:hover .sort-icon { color: #64748b; }
-      .filter-row th { padding: 6px 16px 10px; background: #f8fafc; border-bottom: 2px solid #e2e8f0; }
+      th.sortable:hover .sort-icon, .header-sort:hover .sort-icon { color: #64748b; }
       .th-filter { width: 100%; padding: 6px 10px; border: 1px solid #e2e8f0; border-radius: 6px; font-size: 0.82rem; font-family: inherit; background: #fff; outline: none; color: #334155; box-sizing: border-box; }
       .th-filter:focus { border-color: #3b82f6; box-shadow: 0 0 0 2px rgba(59,130,246,0.1); }
-      select.th-filter { cursor: pointer; }
 
       td {
         padding: 12px 16px;
@@ -187,6 +210,9 @@ export class AuditLogsComponent implements OnInit {
   protected readonly logs = signal<AuditEntry[]>([]);
   protected readonly filteredLogs = signal<AuditEntry[]>([]);
   protected readonly actionTypes = signal<string[]>([]);
+  protected readonly actionOptions = computed<SearchableSelectOption[]>(() =>
+    this.actionTypes().map((action) => ({ value: action, label: action })),
+  );
   protected readonly page = signal(1);
   protected readonly totalPages = signal(1);
   protected readonly sortField = signal<SortField | ''>('');

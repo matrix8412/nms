@@ -1,13 +1,17 @@
 import { CommonModule } from '@angular/common';
-import { Component, EventEmitter, inject, Input, OnInit, Output, signal } from '@angular/core';
+import { Component, EventEmitter, Input, OnInit, Output, inject, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { ApiService } from '../../core/http/api.service';
+import { SearchableSelectComponent, type SearchableSelectOption } from '../../core/layout/searchable-select.component';
+import { normalizeSearchText } from '../../core/utils/search.util';
 import type { DeviceDto } from '@nms/shared';
+
+interface DeviceGroupOption extends SearchableSelectOption {}
 
 @Component({
   selector: 'app-host-form',
   standalone: true,
-  imports: [CommonModule, FormsModule],
+  imports: [CommonModule, FormsModule, SearchableSelectComponent],
   template: `
     <form (ngSubmit)="onSubmit()" class="form">
       <div class="form-group">
@@ -21,13 +25,31 @@ import type { DeviceDto } from '@nms/shared';
       </div>
 
       <div class="form-group">
-        <label for="vendor">Vendor</label>
-        <input id="vendor" type="text" [(ngModel)]="form.vendor" name="vendor" placeholder="e.g. Cisco, Mikrotik" />
+        <label>Vendor</label>
+        <app-searchable-select
+          [(ngModel)]="form.vendor"
+          [ngModelOptions]="{ standalone: true }"
+          [options]="vendors()"
+          placeholder="Select vendor"
+          metaText="Catalog search without diacritics"
+          searchPlaceholder="Search vendor"
+          emptyOptionLabel="No vendor"
+          emptyStateLabel="No matching vendors"
+        />
       </div>
 
       <div class="form-group">
-        <label for="type">Type</label>
-        <input id="type" type="text" [(ngModel)]="form.type" name="type" placeholder="e.g. Switch, Router, AP" />
+        <label>Device Type</label>
+        <app-searchable-select
+          [(ngModel)]="form.type"
+          [ngModelOptions]="{ standalone: true }"
+          [options]="deviceTypes()"
+          placeholder="Select device type"
+          metaText="Filter available types instantly"
+          searchPlaceholder="Search device type"
+          emptyOptionLabel="No device type"
+          emptyStateLabel="No matching device types"
+        />
       </div>
 
       <div class="form-group">
@@ -37,16 +59,17 @@ import type { DeviceDto } from '@nms/shared';
 
       <div class="form-group" *ngIf="deviceGroups().length > 0">
         <label>Device Groups</label>
-        <div class="checkbox-list">
-          <label *ngFor="let group of deviceGroups()" class="checkbox-item">
-            <input
-              type="checkbox"
-              [checked]="form.deviceGroupIds.includes(group.id)"
-              (change)="toggleGroup(group.id)"
-            />
-            <span>{{ group.name }}</span>
-          </label>
-        </div>
+        <app-searchable-select
+          [(ngModel)]="form.deviceGroupIds"
+          [ngModelOptions]="{ standalone: true }"
+          [options]="deviceGroups()"
+          [multiple]="true"
+          placeholder="Select device groups"
+          metaText="Multi-select with fulltext search"
+          searchPlaceholder="Search device groups"
+          emptyOptionLabel="No device groups"
+          emptyStateLabel="No matching device groups"
+        />
       </div>
 
       <div class="form-error" *ngIf="error()">{{ error() }}</div>
@@ -57,6 +80,7 @@ import type { DeviceDto } from '@nms/shared';
           {{ submitting() ? 'Saving...' : (host ? 'Update Host' : 'Create Host') }}
         </button>
       </div>
+
     </form>
   `,
   styles: [
@@ -90,62 +114,13 @@ import type { DeviceDto } from '@nms/shared';
         box-shadow: 0 0 0 3px rgba(59,130,246,0.1);
       }
 
-      .checkbox-list {
-        display: flex;
-        flex-direction: column;
-        gap: 8px;
-        max-height: 160px;
-        overflow-y: auto;
-        padding: 8px;
-        border: 1px solid #e2e8f0;
-        border-radius: 10px;
-      }
-      .checkbox-item {
-        display: flex;
-        align-items: center;
-        gap: 8px;
-        font-size: 0.86rem;
-        color: #334155;
-        cursor: pointer;
-      }
-      .checkbox-item input[type="checkbox"] {
-        accent-color: #3b82f6;
-      }
-
       .form-error {
         padding: 10px 14px;
         background: #fef2f2;
         border: 1px solid #fecaca;
         border-radius: 10px;
         color: #dc2626;
-        font-size: 0.86rem;
       }
-
-      .form-actions {
-        display: flex;
-        gap: 10px;
-        justify-content: flex-end;
-        padding-top: 8px;
-        border-top: 1px solid #f1f5f9;
-      }
-      .btn {
-        display: inline-flex;
-        align-items: center;
-        gap: 6px;
-        padding: 10px 20px;
-        border: none;
-        border-radius: 10px;
-        font-weight: 600;
-        font-size: 0.88rem;
-        cursor: pointer;
-        transition: background 0.15s;
-        font-family: inherit;
-      }
-      .btn-primary { background: #3b82f6; color: #fff; }
-      .btn-primary:hover { background: #2563eb; }
-      .btn-primary:disabled { opacity: 0.6; cursor: not-allowed; }
-      .btn-secondary { background: #e2e8f0; color: #475569; }
-      .btn-secondary:hover { background: #cbd5e1; }
     `,
   ],
 })
@@ -158,7 +133,9 @@ export class HostFormComponent implements OnInit {
 
   protected readonly submitting = signal(false);
   protected readonly error = signal('');
-  protected readonly deviceGroups = signal<{ id: string; name: string }[]>([]);
+  protected readonly vendors = signal<SearchableSelectOption[]>([]);
+  protected readonly deviceTypes = signal<SearchableSelectOption[]>([]);
+  protected readonly deviceGroups = signal<DeviceGroupOption[]>([]);
 
   protected form = {
     name: '',
@@ -181,21 +158,30 @@ export class HostFormComponent implements OnInit {
       };
     }
 
-    this.api.getDeviceGroups().subscribe({
+    this.api.getVendors().subscribe({
       next: (res) => {
-        const groups = (res.data as Array<{ id: string; name: string }>);
-        this.deviceGroups.set(groups);
+        const options = this.toCatalogOptions(res.data as Array<{ id: string; name: string }>);
+        this.vendors.set(this.withCurrentSelection(options, this.form.vendor));
       },
     });
-  }
 
-  protected toggleGroup(id: string) {
-    const idx = this.form.deviceGroupIds.indexOf(id);
-    if (idx >= 0) {
-      this.form.deviceGroupIds.splice(idx, 1);
-    } else {
-      this.form.deviceGroupIds.push(id);
-    }
+    this.api.getDeviceTypes().subscribe({
+      next: (res) => {
+        const options = this.toCatalogOptions(res.data as Array<{ id: string; name: string }>);
+        this.deviceTypes.set(this.withCurrentSelection(options, this.form.type));
+      },
+    });
+
+    this.api.getDeviceGroups().subscribe({
+      next: (res) => {
+        const groups = (res.data as Array<{ id: string; name: string; description?: string | null }>).map((group) => ({
+          value: group.id,
+          label: group.name,
+          description: group.description ?? null,
+        }));
+        this.deviceGroups.set(this.sortByLabel(groups));
+      },
+    });
   }
 
   protected onSubmit() {
@@ -225,5 +211,23 @@ export class HostFormComponent implements OnInit {
         this.error.set(err?.error?.message || 'An error occurred');
       },
     });
+  }
+
+  private toCatalogOptions(items: Array<{ id: string; name: string }>): SearchableSelectOption[] {
+    return this.sortByLabel(items.map((item) => ({ value: item.name, label: item.name })));
+  }
+
+  private withCurrentSelection(options: SearchableSelectOption[], currentValue: string): SearchableSelectOption[] {
+    const value = currentValue.trim();
+    if (!value) return options;
+
+    const exists = options.some((option) => normalizeSearchText(option.label) === normalizeSearchText(value));
+    if (exists) return options;
+
+    return this.sortByLabel([{ value, label: value }, ...options]);
+  }
+
+  private sortByLabel<T extends { label: string }>(items: T[]): T[] {
+    return [...items].sort((left, right) => left.label.localeCompare(right.label, 'sk', { sensitivity: 'base' }));
   }
 }
