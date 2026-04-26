@@ -58,6 +58,41 @@ import type { DeviceDto } from '@nms/shared';
             <span class="info-value mono">{{ host()!.zabbixHostId || 'Not linked' }}</span>
           </div>
           <div class="info-row">
+            <span class="info-label">SNMP Status</span>
+            <span class="info-value">
+              <span class="status-badge"
+                    [class.status-up]="host()!.snmpStatus === 'UP'"
+                    [class.status-down]="host()!.snmpStatus === 'DOWN'"
+                    [class.status-unknown]="host()!.snmpStatus === 'UNKNOWN'">
+                <span class="status-dot"></span>
+                {{ host()!.snmpStatus }}
+              </span>
+              <span class="ping-info" *ngIf="host()!.snmp?.version">
+                {{ host()!.snmp?.version }} / {{ host()!.snmp?.port }}
+              </span>
+            </span>
+          </div>
+          <div class="info-row" *ngIf="host()!.snmpHostname">
+            <span class="info-label">SNMP Hostname</span>
+            <span class="info-value">{{ host()!.snmpHostname }}</span>
+          </div>
+          <div class="info-row" *ngIf="host()!.snmpSoftwareVersion">
+            <span class="info-label">Software Version</span>
+            <span class="info-value">{{ host()!.snmpSoftwareVersion }}</span>
+          </div>
+          <div class="info-row" *ngIf="host()!.snmpUptimeTicks != null">
+            <span class="info-label">SNMP Uptime</span>
+            <span class="info-value">{{ formatSnmpUptime(host()!.snmpUptimeTicks!) }}</span>
+          </div>
+          <div class="info-row" *ngIf="host()!.snmpLastSyncAt">
+            <span class="info-label">Last SNMP Sync</span>
+            <span class="info-value">{{ host()!.snmpLastSyncAt | date:'medium' }}</span>
+          </div>
+          <div class="info-row" *ngIf="host()!.snmpLastError">
+            <span class="info-label">SNMP Error</span>
+            <span class="info-value">{{ host()!.snmpLastError }}</span>
+          </div>
+          <div class="info-row">
             <span class="info-label">ICMP Status</span>
             <span class="info-value">
               <span class="status-badge"
@@ -106,6 +141,43 @@ import type { DeviceDto } from '@nms/shared';
         <div class="empty-state" *ngIf="metrics().length === 0">
           <span class="material-icons">info</span>
           <p>No metrics collected yet.</p>
+        </div>
+      </div>
+
+      <div class="info-card interfaces-card" *ngIf="host()!.snmpInterfaces?.length">
+        <div class="card-title">
+          <span class="material-icons">lan</span>
+          Network Interfaces
+        </div>
+        <div class="table-wrap">
+          <table>
+            <thead>
+              <tr>
+                <th>#</th>
+                <th>Name</th>
+                <th>Description</th>
+                <th>MAC</th>
+                <th>Oper State</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr *ngFor="let item of host()!.snmpInterfaces || []">
+                <td class="mono">{{ item.index }}</td>
+                <td>{{ item.name }}</td>
+                <td>{{ item.description || '—' }}</td>
+                <td class="mono">{{ item.mac || '—' }}</td>
+                <td>
+                  <span class="status-badge"
+                        [class.status-up]="item.operStatus === 'up'"
+                        [class.status-down]="item.operStatus === 'down'"
+                        [class.status-unknown]="item.operStatus !== 'up' && item.operStatus !== 'down'">
+                    <span class="status-dot"></span>
+                    {{ item.operStatus || 'unknown' }}
+                  </span>
+                </td>
+              </tr>
+            </tbody>
+          </table>
         </div>
       </div>
     </div>
@@ -186,6 +258,9 @@ import type { DeviceDto } from '@nms/shared';
         border-radius: 14px;
         box-shadow: 0 1px 4px rgba(0,0,0,0.06);
         overflow: hidden;
+      }
+      .interfaces-card {
+        grid-column: 1 / -1;
       }
       .card-title {
         display: flex;
@@ -331,5 +406,15 @@ export class HostDetailComponent implements OnInit {
   protected onSaved() {
     this.editPanelOpen.set(false);
     this.loadHost();
+  }
+
+  protected formatSnmpUptime(ticks: number) {
+    const totalSeconds = Math.floor(ticks / 100);
+    const days = Math.floor(totalSeconds / 86400);
+    const hours = Math.floor((totalSeconds % 86400) / 3600);
+    const minutes = Math.floor((totalSeconds % 3600) / 60);
+    const seconds = totalSeconds % 60;
+    const dayPart = days > 0 ? `${days}d ` : '';
+    return `${dayPart}${hours}h ${minutes}m ${seconds}s`.trim();
   }
 }

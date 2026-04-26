@@ -6,6 +6,7 @@ import { ApiService } from '../../core/http/api.service';
 import { ColumnFilterTriggerComponent } from '../../core/layout/column-filter-trigger.component';
 import { SlidePanelComponent } from '../../core/layout/slide-panel.component';
 import { HostGroupsComponent } from '../hosts/host-groups.component';
+import { SnmpTemplatesComponent } from './snmp-templates.component';
 
 interface CatalogItem { id: string; name: string; createdAt: string; }
 
@@ -15,12 +16,12 @@ type SortDir = 'asc' | 'desc';
 @Component({
   selector: 'app-catalogs',
   standalone: true,
-  imports: [CommonModule, FormsModule, SlidePanelComponent, HostGroupsComponent, ColumnFilterTriggerComponent],
+  imports: [CommonModule, FormsModule, SlidePanelComponent, HostGroupsComponent, SnmpTemplatesComponent, ColumnFilterTriggerComponent],
   template: `
     <div class="page-header">
       <div>
         <h1>Catalogs</h1>
-        <p class="subtitle">Manage vendors, device types, and host groups</p>
+        <p class="subtitle">Manage vendors, device types, host groups, and SNMP OID templates</p>
       </div>
     </div>
 
@@ -35,12 +36,16 @@ type SortDir = 'asc' | 'desc';
       <button class="tab" [class.active]="activeTab() === 'host-groups'" (click)="selectTab('host-groups')">
         <span class="material-icons">folder</span> Host Groups
       </button>
+      <button class="tab" [class.active]="activeTab() === 'snmp-templates'" (click)="selectTab('snmp-templates')">
+        <span class="material-icons">router</span> SNMP Templates
+      </button>
     </div>
 
     <!-- Content -->
     <app-host-groups *ngIf="activeTab() === 'host-groups'" [embedded]="true" />
+    <app-snmp-templates *ngIf="activeTab() === 'snmp-templates'" />
 
-    <div class="table-card" *ngIf="activeTab() !== 'host-groups'">
+    <div class="table-card" *ngIf="activeTab() !== 'host-groups' && activeTab() !== 'snmp-templates'">
       <div class="table-toolbar">
         <div style="flex:1"></div>
         <button class="btn btn-primary" (click)="openCreate()">
@@ -192,7 +197,7 @@ export class CatalogsComponent implements OnInit {
   private readonly router = inject(Router);
   private readonly route = inject(ActivatedRoute);
 
-  protected readonly activeTab = signal<'vendors' | 'device-types' | 'host-groups'>('vendors');
+  protected readonly activeTab = signal<'vendors' | 'device-types' | 'host-groups' | 'snmp-templates'>('vendors');
   protected readonly vendors = signal<CatalogItem[]>([]);
   protected readonly deviceTypes = signal<CatalogItem[]>([]);
   protected readonly searchQuery = signal('');
@@ -242,7 +247,7 @@ export class CatalogsComponent implements OnInit {
     this.loadAll();
   }
 
-  protected selectTab(tab: 'vendors' | 'device-types' | 'host-groups') {
+  protected selectTab(tab: 'vendors' | 'device-types' | 'host-groups' | 'snmp-templates') {
     this.activeTab.set(tab);
     void this.router.navigate(['/settings/catalogs'], {
       queryParams: { tab },
@@ -250,9 +255,9 @@ export class CatalogsComponent implements OnInit {
     });
   }
 
-  private resolveInitialTab(): 'vendors' | 'device-types' | 'host-groups' {
+  private resolveInitialTab(): 'vendors' | 'device-types' | 'host-groups' | 'snmp-templates' {
     const tab = this.route.snapshot.queryParamMap.get('tab');
-    if (tab === 'vendors' || tab === 'device-types' || tab === 'host-groups') {
+    if (tab === 'vendors' || tab === 'device-types' || tab === 'host-groups' || tab === 'snmp-templates') {
       return tab;
     }
 

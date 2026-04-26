@@ -18,6 +18,27 @@ enum IcmpStatus {
   DOWN
 }
 
+enum SnmpVersion {
+  V2C
+  V3
+}
+
+enum SnmpAuthProtocol {
+  MD5
+  SHA
+}
+
+enum SnmpPrivProtocol {
+  DES
+  AES
+}
+
+enum SnmpStatus {
+  UNKNOWN
+  UP
+  DOWN
+}
+
 model User {
   id                  String               @id @default(cuid())
   email               String               @unique
@@ -61,6 +82,21 @@ model Device {
   vendor           String?
   type             String?
   zabbixHostId     String?
+  snmpVersion      SnmpVersion?
+  snmpPort         Int               @default(161)
+  snmpCommunity    String?
+  snmpUsername     String?
+  snmpAuthProtocol SnmpAuthProtocol?
+  snmpAuthPassword String?
+  snmpPrivProtocol SnmpPrivProtocol?
+  snmpPrivPassword String?
+  snmpStatus       SnmpStatus        @default(UNKNOWN)
+  snmpLastSyncAt   DateTime?
+  snmpLastError    String?
+  snmpHostname     String?
+  snmpSoftwareVersion String?
+  snmpUptimeTicks  Int?
+  snmpInterfaces   Json?
   icmpStatus       IcmpStatus        @default(UNKNOWN)
   lastPingAt       DateTime?
   lastPingDuration Float?
@@ -171,6 +207,20 @@ model DeviceMetric {
   @@id([id, recordedAt])
   @@index([deviceId, recordedAt(sort: Desc)])
   @@index([itemKey, recordedAt(sort: Desc)])
+}
+
+model SnmpOidTemplate {
+  id         String   @id @default(cuid())
+  vendor     String?
+  deviceType String?
+  metricKey  String
+  oid        String
+  enabled    Boolean  @default(true)
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  @@index([vendor, deviceType])
+  @@unique([vendor, deviceType, metricKey])
 }
 
 model ZabbixItemMapping {

@@ -19,7 +19,8 @@
     "prisma:generate": "prisma generate",
     "prisma:migrate": "prisma migrate dev",
     "prisma:deploy": "prisma migrate deploy",
-    "prisma:seed": "tsx prisma/seed.ts"
+    "prisma:seed": "tsx prisma/seed.ts",
+    "prisma:backfill-snmp-secrets": "tsx prisma/backfill-snmp-secrets.ts"
   },
   "dependencies": {
     "@prisma/client": "^6.16.3",

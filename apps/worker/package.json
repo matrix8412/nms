@@ -14,10 +14,12 @@
     "@nms/db": "workspace:*",
     "@nms/shared": "workspace:*",
     "bullmq": "^5.69.3",
+    "net-snmp": "^3.26.3",
     "pino": "^10.1.0",
     "zod": "^4.1.12"
   },
   "devDependencies": {
+    "@types/net-snmp": "^3.23.0",
     "@types/node": "^24.10.0",
     "tsx": "^4.20.6",
     "typescript": "^5.9.3",

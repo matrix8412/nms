@@ -22,6 +22,16 @@ export class ApiService {
     vendor?: string | null;
     type?: string | null;
     zabbixHostId?: string | null;
+    snmp?: {
+      version: 'V2C' | 'V3';
+      port?: number;
+      community?: string | null;
+      username?: string | null;
+      authProtocol?: 'MD5' | 'SHA' | null;
+      authPassword?: string | null;
+      privProtocol?: 'DES' | 'AES' | null;
+      privPassword?: string | null;
+    } | null;
     deviceGroupIds?: string[];
   }) {
     return this.http.post<{ data: DeviceDto }>('/api/devices', payload);
@@ -35,6 +45,16 @@ export class ApiService {
       vendor?: string | null;
       type?: string | null;
       zabbixHostId?: string | null;
+      snmp?: {
+        version: 'V2C' | 'V3';
+        port?: number;
+        community?: string | null;
+        username?: string | null;
+        authProtocol?: 'MD5' | 'SHA' | null;
+        authPassword?: string | null;
+        privProtocol?: 'DES' | 'AES' | null;
+        privPassword?: string | null;
+      } | null;
       deviceGroupIds?: string[];
     },
   ) {
@@ -126,6 +146,34 @@ export class ApiService {
 
   deleteDeviceType(id: string) {
     return this.http.delete<{ ok: boolean }>(`/api/catalog/device-types/${id}`);
+  }
+
+  getSnmpTemplates() {
+    return this.http.get<{ data: unknown[] }>('/api/catalog/snmp-templates');
+  }
+
+  createSnmpTemplate(payload: {
+    vendor?: string | null;
+    deviceType?: string | null;
+    metricKey: 'hostname' | 'softwareVersion' | 'uptime' | 'ifOperStatus' | 'ifName' | 'ifDescription' | 'ifMac';
+    oid: string;
+    enabled: boolean;
+  }) {
+    return this.http.post<{ data: unknown }>('/api/catalog/snmp-templates', payload);
+  }
+
+  updateSnmpTemplate(id: string, payload: {
+    vendor?: string | null;
+    deviceType?: string | null;
+    metricKey: 'hostname' | 'softwareVersion' | 'uptime' | 'ifOperStatus' | 'ifName' | 'ifDescription' | 'ifMac';
+    oid: string;
+    enabled: boolean;
+  }) {
+    return this.http.patch<{ data: unknown }>(`/api/catalog/snmp-templates/${id}`, payload);
+  }
+
+  deleteSnmpTemplate(id: string) {
+    return this.http.delete<{ ok: boolean }>(`/api/catalog/snmp-templates/${id}`);
   }
 
   // ── Integrations ─────────────────────────────────────────

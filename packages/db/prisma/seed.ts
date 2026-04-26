@@ -1,6 +1,8 @@
 import { PrismaClient } from '@prisma/client';
 import bcrypt from 'bcryptjs';
 
+process.env.DATABASE_URL ??= 'postgresql://nms:nms@localhost:5432/nms?schema=public';
+
 const prisma = new PrismaClient();
 
 const ADMIN_EMAIL = process.env.ADMIN_EMAIL ?? 'admin@kinet.sk';
@@ -97,9 +99,54 @@ async function seedIntegrations() {
   }
 }
 
+async function seedSnmpTemplates() {
+  const templates = [
+    { vendor: null, deviceType: null, metricKey: 'hostname', oid: '1.3.6.1.2.1.1.5.0' },
+    { vendor: null, deviceType: null, metricKey: 'softwareVersion', oid: '1.3.6.1.2.1.1.1.0' },
+    { vendor: null, deviceType: null, metricKey: 'uptime', oid: '1.3.6.1.2.1.1.3.0' },
+    { vendor: null, deviceType: null, metricKey: 'ifOperStatus', oid: '1.3.6.1.2.1.2.2.1.8' },
+    { vendor: null, deviceType: null, metricKey: 'ifName', oid: '1.3.6.1.2.1.31.1.1.1.1' },
+    { vendor: null, deviceType: null, metricKey: 'ifDescription', oid: '1.3.6.1.2.1.2.2.1.2' },
+    { vendor: null, deviceType: null, metricKey: 'ifMac', oid: '1.3.6.1.2.1.2.2.1.6' },
+    { vendor: 'MikroTik', deviceType: null, metricKey: 'softwareVersion', oid: '1.3.6.1.4.1.14988.1.1.7.4.0' },
+    { vendor: 'Mikrotik', deviceType: null, metricKey: 'softwareVersion', oid: '1.3.6.1.4.1.14988.1.1.7.4.0' },
+    { vendor: 'Mikrotik', deviceType: 'Router', metricKey: 'softwareVersion', oid: '1.3.6.1.4.1.14988.1.1.7.4.0' },
+    { vendor: 'Mikrotik', deviceType: 'Router', metricKey: 'hostname', oid: '1.3.6.1.2.1.1.5.0' },
+    { vendor: 'Mikrotik', deviceType: 'Router', metricKey: 'uptime', oid: '1.3.6.1.2.1.1.3.0' },
+    { vendor: 'Mikrotik', deviceType: 'Router', metricKey: 'ifName', oid: '1.3.6.1.2.1.31.1.1.1.1' },
+    { vendor: 'Mikrotik', deviceType: 'Router', metricKey: 'ifDescription', oid: '1.3.6.1.2.1.2.2.1.2' },
+    { vendor: 'Mikrotik', deviceType: 'Router', metricKey: 'ifOperStatus', oid: '1.3.6.1.2.1.2.2.1.8' },
+    { vendor: 'Mikrotik', deviceType: 'Router', metricKey: 'ifMac', oid: '1.3.6.1.2.1.2.2.1.6' },
+  ] as const;
+
+  for (const template of templates) {
+    const existing = await prisma.snmpOidTemplate.findFirst({
+      where: {
+        vendor: template.vendor,
+        deviceType: template.deviceType,
+        metricKey: template.metricKey,
+      },
+    });
+
+    if (existing) {
+      console.log(`SNMP template already exists: ${template.vendor ?? 'default'} / ${template.deviceType ?? 'any'} / ${template.metricKey}`);
+      continue;
+    }
+
+    await prisma.snmpOidTemplate.create({
+      data: {
+        ...template,
+        enabled: true,
+      },
+    });
+    console.log(`SNMP template created: ${template.vendor ?? 'default'} / ${template.deviceType ?? 'any'} / ${template.metricKey}`);
+  }
+}
+
 async function main() {
   await seedRoles();
   await seedIntegrations();
+  await seedSnmpTemplates();
 
   const existing = await prisma.user.findUnique({ where: { email: ADMIN_EMAIL } });
   if (existing) {

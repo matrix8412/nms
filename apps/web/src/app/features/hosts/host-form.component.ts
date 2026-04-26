@@ -57,6 +57,73 @@ interface DeviceGroupOption extends SearchableSelectOption {}
         <input id="zabbixHostId" type="text" [(ngModel)]="form.zabbixHostId" name="zabbixHostId" placeholder="Leave empty for manual host" />
       </div>
 
+      <div class="form-section">
+        <div class="section-heading">
+          <span>SNMP Monitoring</span>
+          <small>Optional direct polling for host data and interfaces</small>
+          <small class="field-note" *ngIf="host">Older stored SNMP secrets are re-encrypted automatically the next time you save this host.</small>
+        </div>
+
+        <div class="form-group">
+          <label for="snmpVersion">SNMP Version</label>
+          <select id="snmpVersion" [(ngModel)]="form.snmpVersion" name="snmpVersion" (ngModelChange)="onSnmpVersionChange()">
+            <option value="">Disabled</option>
+            <option value="V2C">SNMP v2c</option>
+            <option value="V3">SNMP v3</option>
+          </select>
+        </div>
+
+        <div class="form-grid" *ngIf="form.snmpVersion">
+          <div class="form-group">
+            <label for="snmpPort">SNMP Port</label>
+            <input id="snmpPort" type="number" [(ngModel)]="form.snmpPort" name="snmpPort" min="1" max="65535" />
+          </div>
+
+          <div class="form-group" *ngIf="form.snmpVersion === 'V2C'">
+            <label for="snmpCommunity">Community</label>
+            <input id="snmpCommunity" type="text" [(ngModel)]="form.snmpCommunity" name="snmpCommunity" placeholder="e.g. public" />
+            <small class="field-hint" *ngIf="host?.snmp?.hasCommunity">Leave empty to keep the stored community.</small>
+          </div>
+
+          <ng-container *ngIf="form.snmpVersion === 'V3'">
+            <div class="form-group">
+              <label for="snmpUsername">Username</label>
+              <input id="snmpUsername" type="text" [(ngModel)]="form.snmpUsername" name="snmpUsername" placeholder="SNMP v3 username" />
+            </div>
+
+            <div class="form-group">
+              <label for="snmpAuthProtocol">Auth Protocol</label>
+              <select id="snmpAuthProtocol" [(ngModel)]="form.snmpAuthProtocol" name="snmpAuthProtocol">
+                <option value="">Select protocol</option>
+                <option value="MD5">MD5</option>
+                <option value="SHA">SHA</option>
+              </select>
+            </div>
+
+            <div class="form-group">
+              <label for="snmpAuthPassword">Auth Password</label>
+              <input id="snmpAuthPassword" type="text" [(ngModel)]="form.snmpAuthPassword" name="snmpAuthPassword" placeholder="SNMP v3 auth password" />
+              <small class="field-hint" *ngIf="host?.snmp?.hasAuthPassword">Leave empty to keep the stored auth password.</small>
+            </div>
+
+            <div class="form-group">
+              <label for="snmpPrivProtocol">Privacy Protocol</label>
+              <select id="snmpPrivProtocol" [(ngModel)]="form.snmpPrivProtocol" name="snmpPrivProtocol">
+                <option value="">No privacy</option>
+                <option value="DES">DES</option>
+                <option value="AES">AES</option>
+              </select>
+            </div>
+
+            <div class="form-group">
+              <label for="snmpPrivPassword">Privacy Password</label>
+              <input id="snmpPrivPassword" type="text" [(ngModel)]="form.snmpPrivPassword" name="snmpPrivPassword" placeholder="Required when privacy protocol is set" />
+              <small class="field-hint" *ngIf="host?.snmp?.hasPrivPassword">Leave empty to keep the stored privacy password.</small>
+            </div>
+          </ng-container>
+        </div>
+      </div>
+
       <div class="form-group" *ngIf="deviceGroups().length > 0">
         <label>Device Groups</label>
         <app-searchable-select
@@ -100,18 +167,61 @@ interface DeviceGroupOption extends SearchableSelectOption {}
         font-weight: 600;
         color: #475569;
       }
-      .form-group input[type="text"] {
+      .form-group input[type="text"],
+      .form-group input[type="number"],
+      .form-group select {
         padding: 10px 14px;
         border: 1px solid #e2e8f0;
         border-radius: 10px;
         font-size: 0.88rem;
         font-family: inherit;
+        background: #fff;
         transition: border-color 0.15s;
         outline: none;
       }
-      .form-group input[type="text"]:focus {
+      .form-group input[type="text"]:focus,
+      .form-group input[type="number"]:focus,
+      .form-group select:focus {
         border-color: #3b82f6;
         box-shadow: 0 0 0 3px rgba(59,130,246,0.1);
+      }
+
+      .form-section {
+        display: flex;
+        flex-direction: column;
+        gap: 14px;
+        padding: 16px;
+        border: 1px solid #e2e8f0;
+        border-radius: 14px;
+        background: #f8fafc;
+      }
+      .section-heading {
+        display: flex;
+        flex-direction: column;
+        gap: 4px;
+      }
+      .section-heading span {
+        font-size: 0.9rem;
+        font-weight: 700;
+        color: #1e293b;
+      }
+      .section-heading small,
+      .field-hint {
+        color: #64748b;
+        font-size: 0.78rem;
+      }
+      .field-note {
+        color: #1d4ed8;
+      }
+      .form-grid {
+        display: grid;
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        gap: 14px;
+      }
+      @media (max-width: 720px) {
+        .form-grid {
+          grid-template-columns: 1fr;
+        }
       }
 
       .form-error {
@@ -143,6 +253,14 @@ export class HostFormComponent implements OnInit {
     vendor: '',
     type: '',
     zabbixHostId: '',
+    snmpVersion: '',
+    snmpPort: 161,
+    snmpCommunity: '',
+    snmpUsername: '',
+    snmpAuthProtocol: '',
+    snmpAuthPassword: '',
+    snmpPrivProtocol: '',
+    snmpPrivPassword: '',
     deviceGroupIds: [] as string[],
   };
 
@@ -154,6 +272,14 @@ export class HostFormComponent implements OnInit {
         vendor: this.host.vendor ?? '',
         type: this.host.type ?? '',
         zabbixHostId: this.host.zabbixHostId ?? '',
+        snmpVersion: this.host.snmp?.version ?? '',
+        snmpPort: this.host.snmp?.port ?? 161,
+        snmpCommunity: '',
+        snmpUsername: this.host.snmp?.username ?? '',
+        snmpAuthProtocol: this.host.snmp?.authProtocol ?? '',
+        snmpAuthPassword: '',
+        snmpPrivProtocol: this.host.snmp?.privProtocol ?? '',
+        snmpPrivPassword: '',
         deviceGroupIds: [...(this.host.groupIds ?? [])],
       };
     }
@@ -188,12 +314,15 @@ export class HostFormComponent implements OnInit {
     this.error.set('');
     this.submitting.set(true);
 
+    const snmp = this.buildSnmpPayload();
+
     const payload = {
       name: this.form.name.trim(),
       ip: this.form.ip.trim(),
       vendor: this.form.vendor.trim() || null,
       type: this.form.type.trim() || null,
       zabbixHostId: this.form.zabbixHostId.trim() || null,
+      snmp,
       deviceGroupIds: this.form.deviceGroupIds,
     };
 
@@ -211,6 +340,59 @@ export class HostFormComponent implements OnInit {
         this.error.set(err?.error?.message || 'An error occurred');
       },
     });
+  }
+
+  protected onSnmpVersionChange() {
+    if (this.form.snmpVersion === 'V2C') {
+      this.form.snmpUsername = '';
+      this.form.snmpAuthProtocol = '';
+      this.form.snmpAuthPassword = '';
+      this.form.snmpPrivProtocol = '';
+      this.form.snmpPrivPassword = '';
+      return;
+    }
+
+    if (this.form.snmpVersion === 'V3') {
+      this.form.snmpCommunity = '';
+      return;
+    }
+
+    this.form.snmpPort = 161;
+    this.form.snmpCommunity = '';
+    this.form.snmpUsername = '';
+    this.form.snmpAuthProtocol = '';
+    this.form.snmpAuthPassword = '';
+    this.form.snmpPrivProtocol = '';
+    this.form.snmpPrivPassword = '';
+  }
+
+  private buildSnmpPayload() {
+    if (!this.form.snmpVersion) {
+      return null;
+    }
+
+    if (this.form.snmpVersion === 'V2C') {
+      return {
+        version: 'V2C' as const,
+        port: Number(this.form.snmpPort) || 161,
+        community: this.normalizeOptional(this.form.snmpCommunity),
+      };
+    }
+
+    return {
+      version: 'V3' as const,
+      port: Number(this.form.snmpPort) || 161,
+      username: this.normalizeOptional(this.form.snmpUsername),
+      authProtocol: this.normalizeOptional(this.form.snmpAuthProtocol) as 'MD5' | 'SHA' | undefined,
+      authPassword: this.normalizeOptional(this.form.snmpAuthPassword),
+      privProtocol: this.normalizeOptional(this.form.snmpPrivProtocol) as 'DES' | 'AES' | undefined,
+      privPassword: this.normalizeOptional(this.form.snmpPrivPassword),
+    };
+  }
+
+  private normalizeOptional(value: string): string | undefined {
+    const normalized = value.trim();
+    return normalized || undefined;
   }
 
   private toCatalogOptions(items: Array<{ id: string; name: string }>): SearchableSelectOption[] {

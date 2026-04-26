@@ -122,43 +122,102 @@ type SortDir = 'asc' | 'desc';
             </tr>
           </thead>
           <tbody>
-            <tr *ngFor="let host of sortedHosts()" class="row-hover">
-              <td class="status-col">
-                <span class="status-dot"
-                      [class.status-up]="host.icmpStatus === 'UP'"
-                      [class.status-down]="host.icmpStatus === 'DOWN'"
-                      [class.status-unknown]="host.icmpStatus === 'UNKNOWN'"
-                      [title]="host.icmpStatus + (host.lastPingDuration != null ? ' (' + host.lastPingDuration + ' ms)' : '')">
-                </span>
-                <span class="status-label"
-                      [class.status-up-text]="host.icmpStatus === 'UP'"
-                      [class.status-down-text]="host.icmpStatus === 'DOWN'"
-                      [class.status-unknown-text]="host.icmpStatus === 'UNKNOWN'">
-                  {{ host.icmpStatus }}
-                </span>
-              </td>
-              <td>
-                <a [routerLink]="['/hosts', host.id]" class="host-link">{{ host.name }}</a>
-              </td>
-              <td class="mono">{{ host.ip }}</td>
-              <td>{{ host.vendor || '—' }}</td>
-              <td>
-                <span class="type-badge" *ngIf="host.type">{{ host.type }}</span>
-                <span *ngIf="!host.type">—</span>
-              </td>
-              <td class="mono">{{ host.zabbixHostId || '—' }}</td>
-              <td class="actions-col">
-                <button class="icon-btn" title="View" (click)="viewHost(host)">
-                  <span class="material-icons">visibility</span>
-                </button>
-                <button class="icon-btn" title="Edit" (click)="openEditPanel(host)">
-                  <span class="material-icons">edit</span>
-                </button>
-                <button class="icon-btn danger" title="Delete" (click)="confirmDelete(host)">
-                  <span class="material-icons">delete</span>
-                </button>
-              </td>
-            </tr>
+            <ng-container *ngFor="let host of sortedHosts()">
+              <tr class="row-hover">
+                <td class="status-col">
+                  <span class="status-dot"
+                        [class.status-up]="host.icmpStatus === 'UP'"
+                        [class.status-down]="host.icmpStatus === 'DOWN'"
+                        [class.status-unknown]="host.icmpStatus === 'UNKNOWN'"
+                        [title]="host.icmpStatus + (host.lastPingDuration != null ? ' (' + host.lastPingDuration + ' ms)' : '')">
+                  </span>
+                  <span class="status-label"
+                        [class.status-up-text]="host.icmpStatus === 'UP'"
+                        [class.status-down-text]="host.icmpStatus === 'DOWN'"
+                        [class.status-unknown-text]="host.icmpStatus === 'UNKNOWN'">
+                    {{ host.icmpStatus }}
+                  </span>
+                </td>
+                <td>
+                  <div class="host-cell">
+                    <button
+                      *ngIf="host.snmpInterfaces?.length"
+                      type="button"
+                      class="expand-btn"
+                      (click)="toggleExpanded(host.id)"
+                      [attr.aria-expanded]="isExpanded(host.id)">
+                      <span class="material-icons">{{ isExpanded(host.id) ? 'expand_less' : 'expand_more' }}</span>
+                    </button>
+                    <span *ngIf="!host.snmpInterfaces?.length" class="expand-spacer"></span>
+                    <div class="host-copy">
+                      <a [routerLink]="['/hosts', host.id]" class="host-link">{{ host.name }}</a>
+                      <div class="host-meta" *ngIf="host.snmpHostname || host.snmpSoftwareVersion">
+                        {{ host.snmpHostname || host.snmpSoftwareVersion }}
+                      </div>
+                    </div>
+                  </div>
+                </td>
+                <td class="mono">{{ host.ip }}</td>
+                <td>{{ host.vendor || '—' }}</td>
+                <td>
+                  <span class="type-badge" *ngIf="host.type">{{ host.type }}</span>
+                  <span *ngIf="!host.type">—</span>
+                </td>
+                <td class="mono">{{ host.zabbixHostId || '—' }}</td>
+                <td class="actions-col">
+                  <button class="icon-btn" title="View" (click)="viewHost(host)">
+                    <span class="material-icons">visibility</span>
+                  </button>
+                  <button class="icon-btn" title="Edit" (click)="openEditPanel(host)">
+                    <span class="material-icons">edit</span>
+                  </button>
+                  <button class="icon-btn danger" title="Delete" (click)="confirmDelete(host)">
+                    <span class="material-icons">delete</span>
+                  </button>
+                </td>
+              </tr>
+              <tr *ngIf="isExpanded(host.id)" class="interface-row">
+                <td colspan="7" class="interface-cell">
+                  <div class="interface-panel">
+                    <div class="interface-summary">
+                      <span class="summary-pill" [class.summary-pill-up]="host.snmpStatus === 'UP'" [class.summary-pill-down]="host.snmpStatus === 'DOWN'">
+                        SNMP {{ host.snmpStatus }}
+                      </span>
+                      <span class="summary-pill" *ngIf="host.snmp?.version">{{ host.snmp?.version }} / {{ host.snmp?.port }}</span>
+                      <span class="summary-pill" *ngIf="host.snmpSoftwareVersion">{{ host.snmpSoftwareVersion }}</span>
+                      <span class="summary-pill" *ngIf="host.snmpUptimeTicks != null">Uptime {{ formatSnmpUptime(host.snmpUptimeTicks) }}</span>
+                    </div>
+
+                    <div class="table-wrap interface-table-wrap">
+                      <table>
+                        <thead>
+                          <tr>
+                            <th>#</th>
+                            <th>Name</th>
+                            <th>Description</th>
+                            <th>MAC</th>
+                            <th>Oper State</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          <tr *ngFor="let item of host.snmpInterfaces || []">
+                            <td class="mono">{{ item.index }}</td>
+                            <td>{{ item.name }}</td>
+                            <td>{{ item.description || '—' }}</td>
+                            <td class="mono">{{ item.mac || '—' }}</td>
+                            <td>
+                              <span class="interface-state" [class.interface-state-up]="item.operStatus === 'up'" [class.interface-state-down]="item.operStatus === 'down'">
+                                {{ item.operStatus || 'unknown' }}
+                              </span>
+                            </td>
+                          </tr>
+                        </tbody>
+                      </table>
+                    </div>
+                  </div>
+                </td>
+              </tr>
+            </ng-container>
             <tr *ngIf="sortedHosts().length === 0 && !loading()">
               <td colspan="7" class="empty">No hosts matching your filters.</td>
             </tr>
@@ -312,6 +371,43 @@ type SortDir = 'asc' | 'desc';
       .mono { font-family: 'JetBrains Mono', monospace; font-size: 0.82rem; }
       .host-link { color: #3b82f6; text-decoration: none; font-weight: 600; }
       .host-link:hover { text-decoration: underline; }
+      .host-cell {
+        display: flex;
+        align-items: flex-start;
+        gap: 8px;
+      }
+      .expand-btn {
+        width: 28px;
+        height: 28px;
+        border: none;
+        border-radius: 8px;
+        background: #e2e8f0;
+        color: #334155;
+        cursor: pointer;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        flex: 0 0 auto;
+      }
+      .expand-btn:hover {
+        background: #cbd5e1;
+      }
+      .expand-btn .material-icons {
+        font-size: 18px;
+      }
+      .expand-spacer {
+        width: 28px;
+        flex: 0 0 auto;
+      }
+      .host-copy {
+        display: flex;
+        flex-direction: column;
+        gap: 4px;
+      }
+      .host-meta {
+        color: #64748b;
+        font-size: 0.78rem;
+      }
 
       .type-badge {
         display: inline-block;
@@ -342,6 +438,52 @@ type SortDir = 'asc' | 'desc';
         text-align: center;
         color: #94a3b8;
         padding: 32px 16px !important;
+      }
+
+      .interface-row {
+        background: #f8fafc;
+      }
+      .interface-cell {
+        padding: 0 !important;
+      }
+      .interface-panel {
+        padding: 16px;
+        border-top: 1px solid #e2e8f0;
+        display: flex;
+        flex-direction: column;
+        gap: 14px;
+      }
+      .interface-summary {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 8px;
+      }
+      .summary-pill,
+      .interface-state {
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+        padding: 4px 10px;
+        border-radius: 999px;
+        background: #e2e8f0;
+        color: #334155;
+        font-size: 0.78rem;
+        font-weight: 600;
+      }
+      .summary-pill-up,
+      .interface-state-up {
+        background: #dcfce7;
+        color: #166534;
+      }
+      .summary-pill-down,
+      .interface-state-down {
+        background: #fee2e2;
+        color: #b91c1c;
+      }
+      .interface-table-wrap {
+        border: 1px solid #e2e8f0;
+        border-radius: 12px;
+        background: #fff;
       }
 
       /* Delete Confirm */
@@ -392,6 +534,7 @@ export class HostListComponent implements OnInit, OnDestroy {
 
   protected readonly availableTypes = signal<string[]>([]);
   protected readonly filteredHosts = signal<DeviceDto[]>([]);
+  protected readonly expandedHostIds = signal<string[]>([]);
   protected readonly typeOptions = computed<SearchableSelectOption[]>(() =>
     this.availableTypes().map((type) => ({ value: type, label: type })),
   );
@@ -506,6 +649,26 @@ export class HostListComponent implements OnInit, OnDestroy {
   protected onSaved() {
     this.closePanel();
     this.loadHosts();
+  }
+
+  protected toggleExpanded(hostId: string) {
+    this.expandedHostIds.update((ids) =>
+      ids.includes(hostId) ? ids.filter((item) => item !== hostId) : [...ids, hostId],
+    );
+  }
+
+  protected isExpanded(hostId: string) {
+    return this.expandedHostIds().includes(hostId);
+  }
+
+  protected formatSnmpUptime(ticks: number) {
+    const totalSeconds = Math.floor(ticks / 100);
+    const days = Math.floor(totalSeconds / 86400);
+    const hours = Math.floor((totalSeconds % 86400) / 3600);
+    const minutes = Math.floor((totalSeconds % 3600) / 60);
+    const seconds = totalSeconds % 60;
+    const dayPart = days > 0 ? `${days}d ` : '';
+    return `${dayPart}${hours}h ${minutes}m ${seconds}s`.trim();
   }
 
   protected viewHost(host: DeviceDto) {

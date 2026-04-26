@@ -12,7 +12,8 @@
     "format:check": "prettier --check .",
     "db:migrate": "corepack pnpm --filter @nms/db run prisma:deploy",
     "db:generate": "corepack pnpm --filter @nms/db run prisma:generate",
-    "db:seed": "corepack pnpm --filter @nms/db run prisma:seed"
+    "db:seed": "corepack pnpm --filter @nms/db run prisma:seed",
+    "db:backfill-snmp-secrets": "corepack pnpm --filter @nms/db run prisma:backfill-snmp-secrets"
   },
   "devDependencies": {
     "prettier": "^3.6.2",
