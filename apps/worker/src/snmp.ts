@@ -70,15 +70,28 @@ async function resolveOidMap(vendor?: string | null, deviceType?: string | null)
         { vendor: null, deviceType: null },
       ],
     },
-    orderBy: [{ vendor: 'desc' }, { deviceType: 'desc' }],
   });
 
   const map = { ...DEFAULT_OIDS };
+  const bestByMetric = new Map<SnmpMetricKey, { oid: string; score: number }>();
+
   for (const row of rows) {
-    if (row.metricKey in map) {
-      map[row.metricKey as SnmpMetricKey] = row.oid;
+    if (!(row.metricKey in map)) {
+      continue;
+    }
+
+    const metricKey = row.metricKey as SnmpMetricKey;
+    const score = (row.vendor ? 2 : 0) + (row.deviceType ? 1 : 0);
+    const current = bestByMetric.get(metricKey);
+    if (!current || score > current.score) {
+      bestByMetric.set(metricKey, { oid: row.oid, score });
     }
   }
+
+  for (const [metricKey, candidate] of bestByMetric.entries()) {
+    map[metricKey] = candidate.oid;
+  }
+
   return map;
 }
 

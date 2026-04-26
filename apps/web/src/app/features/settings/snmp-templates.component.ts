@@ -38,7 +38,8 @@ const METRIC_KEY_OPTIONS: Array<{ value: SnmpMetricKey; label: string }> = [
       <div class="table-toolbar">
         <div class="toolbar-copy">
           <div class="toolbar-title">SNMP OID Templates</div>
-          <div class="toolbar-subtitle">Override default OIDs by vendor and device type.</div>
+          <div class="toolbar-subtitle">Templates are applied automatically from the host vendor and device type.</div>
+          <div class="toolbar-subtitle">Priority: exact vendor + type, then vendor-only, then type-only, then default.</div>
         </div>
         <button class="btn btn-primary" (click)="openCreate()">
           <span class="material-icons">add</span> Add SNMP Template

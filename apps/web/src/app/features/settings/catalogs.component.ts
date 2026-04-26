@@ -4,11 +4,12 @@ import { FormsModule } from '@angular/forms';
 import { ActivatedRoute, Router } from '@angular/router';
 import { ApiService } from '../../core/http/api.service';
 import { ColumnFilterTriggerComponent } from '../../core/layout/column-filter-trigger.component';
+import { SearchableSelectComponent, type SearchableSelectOption } from '../../core/layout/searchable-select.component';
 import { SlidePanelComponent } from '../../core/layout/slide-panel.component';
 import { HostGroupsComponent } from '../hosts/host-groups.component';
 import { SnmpTemplatesComponent } from './snmp-templates.component';
 
-interface CatalogItem { id: string; name: string; createdAt: string; }
+interface CatalogItem { id: string; name: string; createdAt: string; vendor?: string | null; }
 
 type SortField = 'name' | 'createdAt';
 type SortDir = 'asc' | 'desc';
@@ -16,7 +17,7 @@ type SortDir = 'asc' | 'desc';
 @Component({
   selector: 'app-catalogs',
   standalone: true,
-  imports: [CommonModule, FormsModule, SlidePanelComponent, HostGroupsComponent, SnmpTemplatesComponent, ColumnFilterTriggerComponent],
+  imports: [CommonModule, FormsModule, SlidePanelComponent, HostGroupsComponent, SnmpTemplatesComponent, ColumnFilterTriggerComponent, SearchableSelectComponent],
   template: `
     <div class="page-header">
       <div>
@@ -67,6 +68,7 @@ type SortDir = 'asc' | 'desc';
                 </app-column-filter-trigger>
               </div>
             </th>
+            <th *ngIf="activeTab() === 'device-types'">Vendor</th>
             <th class="sortable">
               <div class="header-cell">
                 <button type="button" class="header-sort" (click)="toggleSort('createdAt')">
@@ -81,6 +83,7 @@ type SortDir = 'asc' | 'desc';
         <tbody>
           <tr *ngFor="let item of sortedItems()">
             <td class="cell-name">{{ item.name }}</td>
+            <td *ngIf="activeTab() === 'device-types'">{{ item.vendor || 'Any vendor' }}</td>
             <td class="cell-date">{{ item.createdAt | date:'mediumDate' }}</td>
             <td class="col-actions">
               <button class="icon-btn" title="Edit" (click)="openEdit(item)">
@@ -111,6 +114,19 @@ type SortDir = 'asc' | 'desc';
         <label class="form-label">
           Name
           <input class="form-input" [(ngModel)]="formName" name="name" required />
+        </label>
+        <label class="form-label" *ngIf="activeTab() === 'device-types'">
+          Vendor
+          <app-searchable-select
+            [(ngModel)]="formVendor"
+            [ngModelOptions]="{ standalone: true }"
+            [options]="vendorOptions()"
+            placeholder="Any vendor"
+            metaText="Optional device-type scope"
+            searchPlaceholder="Search vendor"
+            emptyOptionLabel="Any vendor"
+            emptyStateLabel="No matching vendors"
+          />
         </label>
         <div class="panel-actions">
           <button type="button" class="btn btn-outline" (click)="panelOpen.set(false)">Cancel</button>
@@ -200,6 +216,9 @@ export class CatalogsComponent implements OnInit {
   protected readonly activeTab = signal<'vendors' | 'device-types' | 'host-groups' | 'snmp-templates'>('vendors');
   protected readonly vendors = signal<CatalogItem[]>([]);
   protected readonly deviceTypes = signal<CatalogItem[]>([]);
+  protected readonly vendorOptions = computed<SearchableSelectOption[]>(() =>
+    this.vendors().map((item) => ({ value: item.name, label: item.name })),
+  );
   protected readonly searchQuery = signal('');
   protected readonly sortField = signal<SortField | ''>('');
   protected readonly sortDir = signal<SortDir>('asc');
@@ -208,11 +227,12 @@ export class CatalogsComponent implements OnInit {
   protected readonly deleteTarget = signal<CatalogItem | null>(null);
 
   protected formName = '';
+  protected formVendor = '';
 
   protected readonly filteredItems = computed(() => {
     const q = this.searchQuery().toLowerCase();
     const items = this.activeTab() === 'vendors' ? this.vendors() : this.deviceTypes();
-    return items.filter((i) => i.name.toLowerCase().includes(q));
+    return items.filter((i) => i.name.toLowerCase().includes(q) || (i.vendor ?? '').toLowerCase().includes(q));
   });
 
   protected readonly sortedItems = computed(() => {
@@ -284,19 +304,21 @@ export class CatalogsComponent implements OnInit {
   protected openCreate() {
     this.editingItem.set(null);
     this.formName = '';
+    this.formVendor = '';
     this.panelOpen.set(true);
   }
 
   protected openEdit(item: CatalogItem) {
     this.editingItem.set(item);
     this.formName = item.name;
+    this.formVendor = item.vendor ?? '';
     this.panelOpen.set(true);
   }
 
   protected save() {
     const edit = this.editingItem();
     const isVendor = this.activeTab() === 'vendors';
-    const payload = { name: this.formName };
+    const payload = isVendor ? { name: this.formName } : { name: this.formName, vendor: this.formVendor || null };
 
     const req = edit
       ? (isVendor ? this.api.updateVendor(edit.id, payload) : this.api.updateDeviceType(edit.id, payload))

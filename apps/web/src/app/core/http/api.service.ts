@@ -133,14 +133,14 @@ export class ApiService {
 
   // ── Device Types (Catalog) ───────────────────────────────
   getDeviceTypes() {
-    return this.http.get<{ data: unknown[] }>('/api/catalog/device-types');
+    return this.http.get<{ data: Array<{ id: string; name: string; vendor?: string | null; createdAt: string }> }>('/api/catalog/device-types');
   }
 
-  createDeviceType(payload: { name: string }) {
+  createDeviceType(payload: { name: string; vendor?: string | null }) {
     return this.http.post<{ data: unknown }>('/api/catalog/device-types', payload);
   }
 
-  updateDeviceType(id: string, payload: { name: string }) {
+  updateDeviceType(id: string, payload: { name: string; vendor?: string | null }) {
     return this.http.patch<{ data: unknown }>(`/api/catalog/device-types/${id}`, payload);
   }
 

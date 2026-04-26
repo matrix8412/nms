@@ -7,7 +7,10 @@ import { assertCsrf } from '@/lib/auth/csrf';
 import { z } from 'zod';
 import type { NextRequest } from 'next/server';
 
-const updateSchema = z.object({ name: z.string().trim().min(1).max(120) });
+const updateSchema = z.object({
+  name: z.string().trim().min(1).max(120),
+  vendor: z.string().trim().max(120).optional().nullable(),
+});
 
 type Params = { params: Promise<{ id: string }> };
 
@@ -16,8 +19,8 @@ export async function PATCH(request: NextRequest, { params }: Params) {
     const { id } = await params;
     const session = await requireAdmin(request);
     assertCsrf(request, session.csrfSecret);
-    const { name } = await parseBody(request, updateSchema);
-    const dt = await prisma.deviceType.update({ where: { id }, data: { name } });
+    const { name, vendor } = await parseBody(request, updateSchema);
+    const dt = await prisma.deviceType.update({ where: { id }, data: { name, vendor: vendor || null } });
     return ok({ data: dt });
   });
 }

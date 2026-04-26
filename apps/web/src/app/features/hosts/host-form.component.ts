@@ -7,6 +7,11 @@ import { normalizeSearchText } from '../../core/utils/search.util';
 import type { DeviceDto } from '@nms/shared';
 
 interface DeviceGroupOption extends SearchableSelectOption {}
+interface DeviceTypeCatalogItem {
+  id: string;
+  name: string;
+  vendor?: string | null;
+}
 
 @Component({
   selector: 'app-host-form',
@@ -28,6 +33,7 @@ interface DeviceGroupOption extends SearchableSelectOption {}
         <label>Vendor</label>
         <app-searchable-select
           [(ngModel)]="form.vendor"
+          (ngModelChange)="onVendorChange()"
           [ngModelOptions]="{ standalone: true }"
           [options]="vendors()"
           placeholder="Select vendor"
@@ -245,6 +251,7 @@ export class HostFormComponent implements OnInit {
   protected readonly error = signal('');
   protected readonly vendors = signal<SearchableSelectOption[]>([]);
   protected readonly deviceTypes = signal<SearchableSelectOption[]>([]);
+  private readonly allDeviceTypes = signal<DeviceTypeCatalogItem[]>([]);
   protected readonly deviceGroups = signal<DeviceGroupOption[]>([]);
 
   protected form = {
@@ -293,8 +300,8 @@ export class HostFormComponent implements OnInit {
 
     this.api.getDeviceTypes().subscribe({
       next: (res) => {
-        const options = this.toCatalogOptions(res.data as Array<{ id: string; name: string }>);
-        this.deviceTypes.set(this.withCurrentSelection(options, this.form.type));
+        this.allDeviceTypes.set(res.data as DeviceTypeCatalogItem[]);
+        this.refreshDeviceTypes();
       },
     });
 
@@ -366,6 +373,29 @@ export class HostFormComponent implements OnInit {
     this.form.snmpPrivPassword = '';
   }
 
+  protected onVendorChange() {
+    const selectedVendor = this.form.vendor.trim();
+    const currentType = this.form.type.trim();
+
+    if (currentType) {
+      const stillAllowed = this.allDeviceTypes().some((item) => {
+        if (normalizeSearchText(item.name) !== normalizeSearchText(currentType)) {
+          return false;
+        }
+        if (!selectedVendor) {
+          return true;
+        }
+        return !item.vendor || normalizeSearchText(item.vendor) === normalizeSearchText(selectedVendor);
+      });
+
+      if (!stillAllowed) {
+        this.form.type = '';
+      }
+    }
+
+    this.refreshDeviceTypes();
+  }
+
   private buildSnmpPayload() {
     if (!this.form.snmpVersion) {
       return null;
@@ -393,6 +423,26 @@ export class HostFormComponent implements OnInit {
   private normalizeOptional(value: string): string | undefined {
     const normalized = value.trim();
     return normalized || undefined;
+  }
+
+  private refreshDeviceTypes() {
+    const selectedVendor = this.form.vendor.trim();
+    const options = this.sortByLabel(
+      this.allDeviceTypes()
+        .filter((item) => {
+          if (!selectedVendor) {
+            return true;
+          }
+          return !item.vendor || normalizeSearchText(item.vendor) === normalizeSearchText(selectedVendor);
+        })
+        .map((item) => ({
+          value: item.name,
+          label: item.name,
+          description: item.vendor ? `Vendor: ${item.vendor}` : 'Vendor: Any',
+        })),
+    );
+
+    this.deviceTypes.set(this.withCurrentSelection(options, this.form.type));
   }
 
   private toCatalogOptions(items: Array<{ id: string; name: string }>): SearchableSelectOption[] {
