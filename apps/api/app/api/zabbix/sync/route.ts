@@ -16,7 +16,10 @@ export async function POST(request: NextRequest) {
 
     const devices = await prisma.device.findMany({
       where: {
-        zabbixHostId: { not: null },
+        OR: [
+          { zabbixHostId: { not: null } },
+          { snmpVersion: { not: null } },
+        ],
         ...(payload.deviceIds?.length
           ? {
               id: { in: payload.deviceIds },

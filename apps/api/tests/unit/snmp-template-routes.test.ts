@@ -35,7 +35,7 @@ describe('SNMP template catalog routes', () => {
 
   it('lists SNMP templates for admin requests', async () => {
     prismaMock.snmpOidTemplate.findMany.mockResolvedValueOnce([
-      { id: '1', vendor: 'MikroTik', deviceType: null, metricKey: 'softwareVersion', oid: '1.2.3', enabled: true },
+      { id: '1', vendor: 'MikroTik', deviceType: null, metricKey: 'softwareVersion', oid: '1.2.3', intervalSec: 1800, enabled: true },
     ]);
 
     const response = await listRouteModule.GET(new Request('http://localhost/api/catalog/snmp-templates') as never);
@@ -49,7 +49,7 @@ describe('SNMP template catalog routes', () => {
   });
 
   it('creates a new SNMP template with normalized nullable fields', async () => {
-    prismaMock.snmpOidTemplate.create.mockResolvedValueOnce({ id: '2', metricKey: 'hostname', oid: '1.3.6.1.2.1.1.5.0' });
+    prismaMock.snmpOidTemplate.create.mockResolvedValueOnce({ id: '2', metricKey: 'hostname', oid: '1.3.6.1.2.1.1.5.0', intervalSec: 1800 });
 
     const response = await listRouteModule.POST(
       new Request('http://localhost/api/catalog/snmp-templates', {
@@ -63,6 +63,7 @@ describe('SNMP template catalog routes', () => {
           deviceType: '',
           metricKey: 'hostname',
           oid: '1.3.6.1.2.1.1.5.0',
+          intervalSec: 1800,
           enabled: true,
         }),
       }) as never,
@@ -76,6 +77,7 @@ describe('SNMP template catalog routes', () => {
         deviceType: null,
         metricKey: 'hostname',
         oid: '1.3.6.1.2.1.1.5.0',
+        intervalSec: 1800,
         enabled: true,
       },
     });
@@ -83,8 +85,44 @@ describe('SNMP template catalog routes', () => {
     expect(body.data.id).toBe('2');
   });
 
+  it('accepts custom metric keys', async () => {
+    prismaMock.snmpOidTemplate.create.mockResolvedValueOnce({ id: '3', metricKey: 'cpuLoad.1m', oid: '1.3.6.1.4.1.9.2.1.57.0', intervalSec: 300 });
+
+    const response = await listRouteModule.POST(
+      new Request('http://localhost/api/catalog/snmp-templates', {
+        method: 'POST',
+        headers: {
+          'content-type': 'application/json',
+          'x-csrf-token': 'csrf-secret',
+        },
+        body: JSON.stringify({
+          vendor: 'Cisco',
+          deviceType: 'Router',
+          metricKey: 'cpuLoad.1m',
+          oid: '1.3.6.1.4.1.9.2.1.57.0',
+          intervalSec: 300,
+          enabled: true,
+        }),
+      }) as never,
+    );
+    const body = await response.json();
+
+    expect(response.status).toBe(201);
+    expect(prismaMock.snmpOidTemplate.create).toHaveBeenCalledWith({
+      data: {
+        vendor: 'Cisco',
+        deviceType: 'Router',
+        metricKey: 'cpuLoad.1m',
+        oid: '1.3.6.1.4.1.9.2.1.57.0',
+        intervalSec: 300,
+        enabled: true,
+      },
+    });
+    expect(body.data.metricKey).toBe('cpuLoad.1m');
+  });
+
   it('updates an existing SNMP template', async () => {
-    prismaMock.snmpOidTemplate.update.mockResolvedValueOnce({ id: 'row-1', metricKey: 'uptime', oid: '1.3.6.1.2.1.1.3.0' });
+    prismaMock.snmpOidTemplate.update.mockResolvedValueOnce({ id: 'row-1', metricKey: 'uptime', oid: '1.3.6.1.2.1.1.3.0', intervalSec: 300 });
 
     const response = await itemRouteModule.PATCH(
       new Request('http://localhost/api/catalog/snmp-templates/row-1', {
@@ -98,6 +136,7 @@ describe('SNMP template catalog routes', () => {
           deviceType: null,
           metricKey: 'uptime',
           oid: '1.3.6.1.2.1.1.3.0',
+          intervalSec: 300,
           enabled: false,
         }),
       }) as never,
@@ -112,6 +151,7 @@ describe('SNMP template catalog routes', () => {
         deviceType: null,
         metricKey: 'uptime',
         oid: '1.3.6.1.2.1.1.3.0',
+        intervalSec: 300,
         enabled: false,
       },
     });

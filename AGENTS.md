@@ -23,6 +23,8 @@
 - Prefer simple, readable code over clever abstractions.
 - Do not duplicate business logic.
 - Extract helpers only when the same logic is used more than once.
+- In forms and edit panels, keep searchable select controls visually consistent with host editing; prefer the compact `app-searchable-select` variant instead of introducing a larger one-off style.
+- For historical or monitoring graphs, use the shared `app-time-series-chart` component with solid lines, a range selector, and MRTG-style min/max/avg legend instead of building one-off SVG charts.
 
 ## Security and safety
 

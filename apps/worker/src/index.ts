@@ -14,7 +14,7 @@ logger.info({ redisUrl: env.REDIS_URL }, 'Connecting to Redis');
 const syncWorker = new Worker<DeviceSyncJobPayload>(
   DEVICE_SYNC_QUEUE,
   async (job) => {
-    await syncDevice(job.data.deviceId);
+    await syncDevice(job.data.deviceId, job.data.force);
   },
   {
     connection,
@@ -25,7 +25,13 @@ const syncWorker = new Worker<DeviceSyncJobPayload>(
 const pingWorker = new Worker<DevicePingJobPayload>(
   DEVICE_PING_QUEUE,
   async (job) => {
-    await pingDevice(job.data.deviceId, job.data.ip, job.data.timeoutSec, job.data.retries);
+    await pingDevice(
+      job.data.deviceId,
+      job.data.ip,
+      job.data.timeoutSec,
+      job.data.retries,
+      job.data.historyRetentionDays,
+    );
   },
   {
     connection,

@@ -215,6 +215,7 @@ model SnmpOidTemplate {
   deviceType String?
   metricKey  String
   oid        String
+  intervalSec Int     @default(1800)
   enabled    Boolean  @default(true)
   createdAt  DateTime @default(now())
   updatedAt  DateTime @updatedAt
@@ -250,6 +251,7 @@ model DeviceType {
   id        String   @id @default(cuid())
   name      String   @unique
   vendor    String?
+  photoDataUrl String?
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 

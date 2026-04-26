@@ -1,0 +1,2 @@
+ALTER TABLE "SnmpOidTemplate"
+ADD COLUMN "intervalSec" INTEGER NOT NULL DEFAULT 1800;

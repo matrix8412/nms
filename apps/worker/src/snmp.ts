@@ -2,7 +2,7 @@ import { Prisma, prisma } from '@nms/db';
 import type { DeviceInterfaceDto } from '@nms/shared';
 import snmp from 'net-snmp';
 
-type SnmpMetricKey =
+type BuiltinSnmpMetricKey =
   | 'hostname'
   | 'softwareVersion'
   | 'uptime'
@@ -10,6 +10,15 @@ type SnmpMetricKey =
   | 'ifName'
   | 'ifDescription'
   | 'ifMac';
+
+type SnmpMetricKey = BuiltinSnmpMetricKey | (string & {});
+
+type SnmpTemplateConfig = {
+  oid: string;
+  intervalSec: number;
+};
+
+type ResolvedSnmpTemplates = Record<BuiltinSnmpMetricKey, SnmpTemplateConfig> & Record<string, SnmpTemplateConfig>;
 
 type SnmpConfig = {
   ip: string;
@@ -24,6 +33,7 @@ type SnmpConfig = {
 };
 
 type SnmpPollMetric = {
+  templateKey: SnmpMetricKey;
   itemKey: string;
   itemName: string;
   valueNumeric: number | null;
@@ -37,17 +47,20 @@ export type SnmpPollResult = {
   uptimeTicks: number | null;
   interfaces: DeviceInterfaceDto[];
   metrics: SnmpPollMetric[];
+  metricIntervals: Record<string, number>;
 };
 
-const DEFAULT_OIDS: Record<SnmpMetricKey, string> = {
-  hostname: '1.3.6.1.2.1.1.5.0',
-  softwareVersion: '1.3.6.1.2.1.1.1.0',
-  uptime: '1.3.6.1.2.1.1.3.0',
-  ifOperStatus: '1.3.6.1.2.1.2.2.1.8',
-  ifName: '1.3.6.1.2.1.31.1.1.1.1',
-  ifDescription: '1.3.6.1.2.1.2.2.1.2',
-  ifMac: '1.3.6.1.2.1.2.2.1.6',
+const DEFAULT_TEMPLATE_CONFIGS: Record<BuiltinSnmpMetricKey, SnmpTemplateConfig> = {
+  hostname: { oid: '1.3.6.1.2.1.1.5.0', intervalSec: 1800 },
+  softwareVersion: { oid: '1.3.6.1.2.1.1.1.0', intervalSec: 1800 },
+  uptime: { oid: '1.3.6.1.2.1.1.3.0', intervalSec: 300 },
+  ifOperStatus: { oid: '1.3.6.1.2.1.2.2.1.8', intervalSec: 300 },
+  ifName: { oid: '1.3.6.1.2.1.31.1.1.1.1', intervalSec: 1800 },
+  ifDescription: { oid: '1.3.6.1.2.1.2.2.1.2', intervalSec: 1800 },
+  ifMac: { oid: '1.3.6.1.2.1.2.2.1.6', intervalSec: 1800 },
 };
+
+const BUILTIN_TEMPLATE_KEYS = new Set<string>(Object.keys(DEFAULT_TEMPLATE_CONFIGS));
 
 const OPER_STATUS_MAP: Record<number, string> = {
   1: 'up',
@@ -59,7 +72,7 @@ const OPER_STATUS_MAP: Record<number, string> = {
   7: 'lowerLayerDown',
 };
 
-async function resolveOidMap(vendor?: string | null, deviceType?: string | null) {
+async function resolveMetricTemplates(vendor?: string | null, deviceType?: string | null): Promise<ResolvedSnmpTemplates> {
   const rows = await prisma.snmpOidTemplate.findMany({
     where: {
       enabled: true,
@@ -72,27 +85,35 @@ async function resolveOidMap(vendor?: string | null, deviceType?: string | null)
     },
   });
 
-  const map = { ...DEFAULT_OIDS };
-  const bestByMetric = new Map<SnmpMetricKey, { oid: string; score: number }>();
+  const map: ResolvedSnmpTemplates = { ...DEFAULT_TEMPLATE_CONFIGS };
+  const bestByMetric = new Map<string, { config: SnmpTemplateConfig; score: number }>();
 
   for (const row of rows) {
-    if (!(row.metricKey in map)) {
-      continue;
-    }
-
-    const metricKey = row.metricKey as SnmpMetricKey;
+    const metricKey = row.metricKey;
     const score = (row.vendor ? 2 : 0) + (row.deviceType ? 1 : 0);
     const current = bestByMetric.get(metricKey);
     if (!current || score > current.score) {
-      bestByMetric.set(metricKey, { oid: row.oid, score });
+      bestByMetric.set(metricKey, {
+        config: {
+          oid: row.oid,
+          intervalSec: row.intervalSec,
+        },
+        score,
+      });
     }
   }
 
   for (const [metricKey, candidate] of bestByMetric.entries()) {
-    map[metricKey] = candidate.oid;
+    map[metricKey] = candidate.config;
   }
 
   return map;
+}
+
+function formatCustomMetricLabel(metricKey: string): string {
+  return metricKey
+    .replace(/[._-]+/g, ' ')
+    .replace(/\b\w/g, (segment) => segment.toUpperCase());
 }
 
 function bufferToMac(value: Buffer): string {
@@ -233,18 +254,21 @@ export async function pollSnmpDevice(
   vendor?: string | null,
   deviceType?: string | null,
 ): Promise<SnmpPollResult> {
-  const oids = await resolveOidMap(vendor, deviceType);
+  const templates = await resolveMetricTemplates(vendor, deviceType);
   const session = createSession(config);
 
   try {
-    const [hostnameValue, softwareVersionValue, uptimeValue, operStatuses, names, descriptions, macs] = await Promise.all([
-      getScalar(session, oids.hostname),
-      getScalar(session, oids.softwareVersion),
-      getScalar(session, oids.uptime),
-      walkColumn(session, oids.ifOperStatus),
-      walkColumn(session, oids.ifName),
-      walkColumn(session, oids.ifDescription),
-      walkColumn(session, oids.ifMac),
+    const customMetricEntries = Object.entries(templates).filter(([metricKey]) => !BUILTIN_TEMPLATE_KEYS.has(metricKey));
+
+    const [hostnameValue, softwareVersionValue, uptimeValue, operStatuses, names, descriptions, macs, ...customValues] = await Promise.all([
+      getScalar(session, templates.hostname.oid),
+      getScalar(session, templates.softwareVersion.oid),
+      getScalar(session, templates.uptime.oid),
+      walkColumn(session, templates.ifOperStatus.oid),
+      walkColumn(session, templates.ifName.oid),
+      walkColumn(session, templates.ifDescription.oid),
+      walkColumn(session, templates.ifMac.oid),
+      ...customMetricEntries.map(([, template]) => getScalar(session, template.oid)),
     ]);
 
     const hostname = stringifyValue(hostnameValue);
@@ -276,24 +300,28 @@ export async function pollSnmpDevice(
 
     const metrics: SnmpPollMetric[] = [
       {
+        templateKey: 'hostname' as const,
         itemKey: 'snmp.hostname',
         itemName: 'Hostname',
         valueNumeric: null,
         valueText: hostname,
       },
       {
+        templateKey: 'softwareVersion' as const,
         itemKey: 'snmp.softwareVersion',
         itemName: 'Software Version',
         valueNumeric: null,
         valueText: softwareVersion,
       },
       {
+        templateKey: 'uptime' as const,
         itemKey: 'snmp.uptimeTicks',
         itemName: 'Uptime',
         valueNumeric: uptimeTicks,
         valueText: uptimeTicks != null ? String(uptimeTicks) : null,
       },
       ...interfaces.map((item) => ({
+        templateKey: 'ifOperStatus' as const,
         itemKey: `snmp.interface.${item.index}.operStatus`,
         itemName: `${item.name} oper status`,
         valueNumeric: null,
@@ -304,6 +332,16 @@ export async function pollSnmpDevice(
           mac: item.mac,
         },
       })),
+      ...customMetricEntries.map(([metricKey], index) => {
+        const rawValue = customValues[index] ?? null;
+        return {
+          templateKey: metricKey,
+          itemKey: `snmp.custom.${metricKey}`,
+          itemName: formatCustomMetricLabel(metricKey),
+          valueNumeric: numberValue(rawValue),
+          valueText: stringifyValue(rawValue),
+        } satisfies SnmpPollMetric;
+      }),
     ].filter((item) => item.valueNumeric != null || item.valueText != null);
 
     return {
@@ -312,6 +350,7 @@ export async function pollSnmpDevice(
       uptimeTicks,
       interfaces,
       metrics,
+      metricIntervals: Object.fromEntries(Object.entries(templates).map(([metricKey, template]) => [metricKey, template.intervalSec])),
     };
   } finally {
     session.close();

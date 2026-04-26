@@ -13,7 +13,15 @@ export class ApiService {
   }
 
   getDevice(deviceId: string) {
-    return this.http.get<{ data: DeviceDto & { metrics: unknown[] } }>(`/api/devices/${deviceId}`);
+    return this.http.get<{ data: DeviceDto & {
+      metrics: unknown[];
+      icmpHistory?: Array<{
+        recordedAt: string;
+        status: 'UP' | 'DOWN';
+        rttMs: number | null;
+        packetLossPercent: number | null;
+      }>;
+    } }>(`/api/devices/${deviceId}`);
   }
 
   createDevice(payload: {
@@ -133,14 +141,14 @@ export class ApiService {
 
   // ── Device Types (Catalog) ───────────────────────────────
   getDeviceTypes() {
-    return this.http.get<{ data: Array<{ id: string; name: string; vendor?: string | null; createdAt: string }> }>('/api/catalog/device-types');
+    return this.http.get<{ data: Array<{ id: string; name: string; vendor?: string | null; photoDataUrl?: string | null; createdAt: string }> }>('/api/catalog/device-types');
   }
 
-  createDeviceType(payload: { name: string; vendor?: string | null }) {
+  createDeviceType(payload: { name: string; vendor?: string | null; photoDataUrl?: string | null }) {
     return this.http.post<{ data: unknown }>('/api/catalog/device-types', payload);
   }
 
-  updateDeviceType(id: string, payload: { name: string; vendor?: string | null }) {
+  updateDeviceType(id: string, payload: { name: string; vendor?: string | null; photoDataUrl?: string | null }) {
     return this.http.patch<{ data: unknown }>(`/api/catalog/device-types/${id}`, payload);
   }
 
@@ -155,8 +163,9 @@ export class ApiService {
   createSnmpTemplate(payload: {
     vendor?: string | null;
     deviceType?: string | null;
-    metricKey: 'hostname' | 'softwareVersion' | 'uptime' | 'ifOperStatus' | 'ifName' | 'ifDescription' | 'ifMac';
+    metricKey: string;
     oid: string;
+    intervalSec: number;
     enabled: boolean;
   }) {
     return this.http.post<{ data: unknown }>('/api/catalog/snmp-templates', payload);
@@ -165,8 +174,9 @@ export class ApiService {
   updateSnmpTemplate(id: string, payload: {
     vendor?: string | null;
     deviceType?: string | null;
-    metricKey: 'hostname' | 'softwareVersion' | 'uptime' | 'ifOperStatus' | 'ifName' | 'ifDescription' | 'ifMac';
+    metricKey: string;
     oid: string;
+    intervalSec: number;
     enabled: boolean;
   }) {
     return this.http.patch<{ data: unknown }>(`/api/catalog/snmp-templates/${id}`, payload);

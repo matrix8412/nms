@@ -7,21 +7,19 @@ import { assertCsrf } from '@/lib/auth/csrf';
 import { z } from 'zod';
 import type { NextRequest } from 'next/server';
 
-const metricKeySchema = z.enum([
-  'hostname',
-  'softwareVersion',
-  'uptime',
-  'ifOperStatus',
-  'ifName',
-  'ifDescription',
-  'ifMac',
-]);
+const metricKeySchema = z
+  .string()
+  .trim()
+  .min(1)
+  .max(120)
+  .regex(/^[a-zA-Z][a-zA-Z0-9._-]*$/, 'Metric key must start with a letter and contain only letters, numbers, dot, underscore, or dash');
 
 const updateSchema = z.object({
   vendor: z.string().trim().max(120).optional().nullable(),
   deviceType: z.string().trim().max(120).optional().nullable(),
   metricKey: metricKeySchema,
   oid: z.string().trim().min(3).max(255),
+  intervalSec: z.coerce.number().int().min(30).max(86400).default(1800),
   enabled: z.boolean().default(true),
 });
 
@@ -40,6 +38,7 @@ export async function PATCH(request: NextRequest, { params }: Params) {
         deviceType: payload.deviceType || null,
         metricKey: payload.metricKey,
         oid: payload.oid,
+        intervalSec: payload.intervalSec,
         enabled: payload.enabled,
       },
     });

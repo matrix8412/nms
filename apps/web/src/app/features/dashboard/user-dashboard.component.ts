@@ -35,7 +35,7 @@ import type { DeviceDto } from '@nms/shared';
           <span class="material-icons">check_circle</span>
         </div>
       </div>
-      <div class="summary-card orange">
+      <div class="summary-card red">
         <div class="card-info">
           <span class="card-value">{{ hostsDown() }}</span>
           <span class="card-label">Hosts Down</span>
@@ -200,8 +200,8 @@ import type { DeviceDto } from '@nms/shared';
       .summary-card.blue .card-icon-wrap { background: #3b82f6; }
       .summary-card.green .card-value { color: #22c55e; }
       .summary-card.green .card-icon-wrap { background: #22c55e; }
-      .summary-card.orange .card-value { color: #f59e0b; }
-      .summary-card.orange .card-icon-wrap { background: #f59e0b; }
+      .summary-card.red .card-value { color: #ef4444; }
+      .summary-card.red .card-icon-wrap { background: #ef4444; }
       .summary-card.teal .card-value { color: #0ea5e9; }
       .summary-card.teal .card-icon-wrap { background: linear-gradient(135deg, #0ea5e9, #6366f1); }
 

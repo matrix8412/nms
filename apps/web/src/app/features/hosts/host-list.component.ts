@@ -35,6 +35,7 @@ type SortDir = 'asc' | 'desc';
         <table>
           <thead>
             <tr>
+              <th class="expand-col"></th>
               <th class="sortable status-col">
                 <div class="header-cell">
                   <button type="button" class="header-sort" (click)="toggleSort('icmpStatus')">
@@ -110,6 +111,24 @@ type SortDir = 'asc' | 'desc';
                   </app-column-filter-trigger>
                 </div>
               </th>
+              <th>
+                <div class="header-cell">
+                  <span>Device groups</span>
+                  <app-column-filter-trigger [active]="!!filterDeviceGroup" label="Filter device groups">
+                    <app-searchable-select
+                      [(ngModel)]="filterDeviceGroup"
+                      (ngModelChange)="applyFilter()"
+                      [ngModelOptions]="{ standalone: true }"
+                      [options]="deviceGroupOptions()"
+                      placeholder="All"
+                      searchPlaceholder="Search device groups"
+                      emptyOptionLabel="All"
+                      emptyStateLabel="No matching device groups"
+                      [compact]="true"
+                    />
+                  </app-column-filter-trigger>
+                </div>
+              </th>
               <th class="sortable">
                 <div class="header-cell">
                   <button type="button" class="header-sort" (click)="toggleSort('zabbixHostId')">
@@ -124,6 +143,16 @@ type SortDir = 'asc' | 'desc';
           <tbody>
             <ng-container *ngFor="let host of sortedHosts()">
               <tr class="row-hover">
+                <td class="expand-col">
+                  <button
+                    type="button"
+                    class="expand-btn expand-btn-inline"
+                    (click)="toggleExpanded(host.id)"
+                    [attr.aria-label]="(isExpanded(host.id) ? 'Hide' : 'Show') + ' device detail for ' + host.name"
+                    [attr.aria-expanded]="isExpanded(host.id)">
+                    {{ isExpanded(host.id) ? '−' : '+' }}
+                  </button>
+                </td>
                 <td class="status-col">
                   <span class="status-dot"
                         [class.status-up]="host.icmpStatus === 'UP'"
@@ -140,20 +169,20 @@ type SortDir = 'asc' | 'desc';
                 </td>
                 <td>
                   <div class="host-cell">
-                    <button
-                      *ngIf="host.snmpInterfaces?.length"
-                      type="button"
-                      class="expand-btn"
-                      (click)="toggleExpanded(host.id)"
-                      [attr.aria-expanded]="isExpanded(host.id)">
-                      <span class="material-icons">{{ isExpanded(host.id) ? 'expand_less' : 'expand_more' }}</span>
-                    </button>
-                    <span *ngIf="!host.snmpInterfaces?.length" class="expand-spacer"></span>
                     <div class="host-copy">
                       <a [routerLink]="['/hosts', host.id]" class="host-link">{{ host.name }}</a>
                       <div class="host-meta" *ngIf="host.snmpHostname || host.snmpSoftwareVersion">
                         {{ host.snmpHostname || host.snmpSoftwareVersion }}
                       </div>
+                      <button
+                        type="button"
+                        class="interfaces-toggle"
+                        (click)="toggleExpanded(host.id)"
+                        [attr.aria-expanded]="isExpanded(host.id)">
+                        <span class="material-icons">{{ isExpanded(host.id) ? 'visibility_off' : 'visibility' }}</span>
+                        {{ isExpanded(host.id) ? 'Hide interfaces' : 'Show interfaces' }}
+                        <span class="interfaces-count">{{ host.snmpInterfaces?.length || 0 }}</span>
+                      </button>
                     </div>
                   </div>
                 </td>
@@ -162,6 +191,12 @@ type SortDir = 'asc' | 'desc';
                 <td>
                   <span class="type-badge" *ngIf="host.type">{{ host.type }}</span>
                   <span *ngIf="!host.type">—</span>
+                </td>
+                <td>
+                  <div class="group-badges" *ngIf="host.deviceGroups?.length; else noDeviceGroups">
+                    <span class="type-badge" *ngFor="let group of host.deviceGroups">{{ group.name }}</span>
+                  </div>
+                  <ng-template #noDeviceGroups>—</ng-template>
                 </td>
                 <td class="mono">{{ host.zabbixHostId || '—' }}</td>
                 <td class="actions-col">
@@ -177,18 +212,37 @@ type SortDir = 'asc' | 'desc';
                 </td>
               </tr>
               <tr *ngIf="isExpanded(host.id)" class="interface-row">
-                <td colspan="7" class="interface-cell">
+                <td colspan="9" class="interface-cell">
                   <div class="interface-panel">
+                    <div class="interface-panel-header">
+                      <div>
+                        <h3>Network interfaces</h3>
+                        <p>{{ host.snmpInterfaces?.length || 0 }} interface{{ (host.snmpInterfaces?.length || 0) === 1 ? '' : 's' }}</p>
+                      </div>
+                      <button
+                        type="button"
+                        class="panel-toggle-btn"
+                        (click)="toggleExpanded(host.id)"
+                        [attr.aria-expanded]="isExpanded(host.id)">
+                        <span class="material-icons">expand_less</span>
+                        Hide
+                      </button>
+                      </div>
                     <div class="interface-summary">
                       <span class="summary-pill" [class.summary-pill-up]="host.snmpStatus === 'UP'" [class.summary-pill-down]="host.snmpStatus === 'DOWN'">
-                        SNMP {{ host.snmpStatus }}
+                          SNMP {{ host.snmpStatus }}
                       </span>
                       <span class="summary-pill" *ngIf="host.snmp?.version">{{ host.snmp?.version }} / {{ host.snmp?.port }}</span>
-                      <span class="summary-pill" *ngIf="host.snmpSoftwareVersion">{{ host.snmpSoftwareVersion }}</span>
+                        <span class="summary-pill" *ngIf="host.snmpSoftwareVersion">{{ host.snmpSoftwareVersion }}</span>
                       <span class="summary-pill" *ngIf="host.snmpUptimeTicks != null">Uptime {{ formatSnmpUptime(host.snmpUptimeTicks) }}</span>
+                      <span class="summary-pill" *ngIf="host.snmpHostname">{{ host.snmpHostname }}</span>
                     </div>
 
-                    <div class="table-wrap interface-table-wrap">
+                    <div class="detail-empty" *ngIf="!host.snmpInterfaces?.length">
+                      Interface data is not available for this host yet.
+                    </div>
+
+                    <div class="table-wrap interface-table-wrap" *ngIf="host.snmpInterfaces?.length">
                       <table>
                         <thead>
                           <tr>
@@ -219,10 +273,10 @@ type SortDir = 'asc' | 'desc';
               </tr>
             </ng-container>
             <tr *ngIf="sortedHosts().length === 0 && !loading()">
-              <td colspan="7" class="empty">No hosts matching your filters.</td>
+              <td colspan="9" class="empty">No hosts matching your filters.</td>
             </tr>
             <tr *ngIf="loading()">
-              <td colspan="7" class="empty">Loading...</td>
+              <td colspan="9" class="empty">Loading...</td>
             </tr>
           </tbody>
         </table>
@@ -343,6 +397,10 @@ type SortDir = 'asc' | 'desc';
       .th-filter:focus { border-color: #3b82f6; box-shadow: 0 0 0 2px rgba(59,130,246,0.1); }
 
       /* Status indicators */
+      .expand-col {
+        width: 52px;
+        text-align: center;
+      }
       .status-col { width: 90px; text-align: center; }
       .status-dot {
         display: inline-block;
@@ -374,7 +432,7 @@ type SortDir = 'asc' | 'desc';
       .host-cell {
         display: flex;
         align-items: flex-start;
-        gap: 8px;
+        gap: 0;
       }
       .expand-btn {
         width: 28px;
@@ -389,11 +447,15 @@ type SortDir = 'asc' | 'desc';
         justify-content: center;
         flex: 0 0 auto;
       }
+      .expand-btn-inline {
+        border: 1px solid #cbd5e1;
+        background: #fff;
+        font-size: 1rem;
+        font-weight: 700;
+        line-height: 1;
+      }
       .expand-btn:hover {
         background: #cbd5e1;
-      }
-      .expand-btn .material-icons {
-        font-size: 18px;
       }
       .expand-spacer {
         width: 28px;
@@ -408,6 +470,39 @@ type SortDir = 'asc' | 'desc';
         color: #64748b;
         font-size: 0.78rem;
       }
+      .interfaces-toggle {
+        width: fit-content;
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+        padding: 0;
+        border: none;
+        background: none;
+        color: #2563eb;
+        cursor: pointer;
+        font: inherit;
+        font-size: 0.78rem;
+        font-weight: 600;
+      }
+      .interfaces-toggle:hover {
+        color: #1d4ed8;
+      }
+      .interfaces-toggle .material-icons {
+        font-size: 16px;
+      }
+      .interfaces-count {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        min-width: 20px;
+        height: 20px;
+        padding: 0 6px;
+        border-radius: 999px;
+        background: #dbeafe;
+        color: #1d4ed8;
+        font-size: 0.72rem;
+        line-height: 1;
+      }
 
       .type-badge {
         display: inline-block;
@@ -417,6 +512,11 @@ type SortDir = 'asc' | 'desc';
         color: #0369a1;
         font-size: 0.78rem;
         font-weight: 600;
+      }
+      .group-badges {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 6px;
       }
 
       .actions-col { text-align: right; white-space: nowrap; }
@@ -453,6 +553,44 @@ type SortDir = 'asc' | 'desc';
         flex-direction: column;
         gap: 14px;
       }
+      .interface-panel-header {
+        display: flex;
+        align-items: flex-start;
+        justify-content: space-between;
+        gap: 12px;
+        flex-wrap: wrap;
+      }
+      .interface-panel-header h3 {
+        margin: 0;
+        font-size: 0.95rem;
+        color: #0f172a;
+      }
+      .interface-panel-header p {
+        margin: 4px 0 0;
+        font-size: 0.78rem;
+        color: #64748b;
+      }
+      .panel-toggle-btn {
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+        padding: 8px 12px;
+        border: 1px solid #cbd5e1;
+        border-radius: 999px;
+        background: #fff;
+        color: #334155;
+        cursor: pointer;
+        font: inherit;
+        font-size: 0.78rem;
+        font-weight: 600;
+      }
+      .panel-toggle-btn:hover {
+        background: #f8fafc;
+        border-color: #94a3b8;
+      }
+      .panel-toggle-btn .material-icons {
+        font-size: 16px;
+      }
       .interface-summary {
         display: flex;
         flex-wrap: wrap;
@@ -484,6 +622,14 @@ type SortDir = 'asc' | 'desc';
         border: 1px solid #e2e8f0;
         border-radius: 12px;
         background: #fff;
+      }
+      .detail-empty {
+        padding: 14px 16px;
+        border: 1px dashed #cbd5e1;
+        border-radius: 12px;
+        background: #fff;
+        color: #64748b;
+        font-size: 0.84rem;
       }
 
       /* Delete Confirm */
@@ -525,6 +671,7 @@ export class HostListComponent implements OnInit, OnDestroy {
   protected filterIp = '';
   protected filterVendor = '';
   protected filterType = '';
+  protected filterDeviceGroup = '';
   protected filterStatus = '';
   protected readonly loading = signal(true);
   protected readonly hosts = signal<DeviceDto[]>([]);
@@ -533,10 +680,14 @@ export class HostListComponent implements OnInit, OnDestroy {
   protected readonly deletingHost = signal<DeviceDto | null>(null);
 
   protected readonly availableTypes = signal<string[]>([]);
+  protected readonly availableDeviceGroups = signal<string[]>([]);
   protected readonly filteredHosts = signal<DeviceDto[]>([]);
   protected readonly expandedHostIds = signal<string[]>([]);
   protected readonly typeOptions = computed<SearchableSelectOption[]>(() =>
     this.availableTypes().map((type) => ({ value: type, label: type })),
+  );
+  protected readonly deviceGroupOptions = computed<SearchableSelectOption[]>(() =>
+    this.availableDeviceGroups().map((group) => ({ value: group, label: group })),
   );
 
   protected readonly sortField = signal<SortField | ''>('');
@@ -574,6 +725,7 @@ export class HostListComponent implements OnInit, OnDestroy {
       next: (res) => {
         this.hosts.set(res.data);
         this.extractTypes(res.data);
+        this.extractDeviceGroups(res.data);
         this.applyFilter();
         this.loading.set(false);
       },
@@ -587,6 +739,7 @@ export class HostListComponent implements OnInit, OnDestroy {
       next: (res) => {
         this.hosts.set(res.data);
         this.extractTypes(res.data);
+        this.extractDeviceGroups(res.data);
         this.applyFilter();
       },
     });
@@ -600,11 +753,22 @@ export class HostListComponent implements OnInit, OnDestroy {
     this.availableTypes.set([...types].sort());
   }
 
+  private extractDeviceGroups(devices: DeviceDto[]) {
+    const groups = new Set<string>();
+    for (const device of devices) {
+      for (const group of device.deviceGroups ?? []) {
+        if (group.name) groups.add(group.name);
+      }
+    }
+    this.availableDeviceGroups.set([...groups].sort());
+  }
+
   protected applyFilter() {
     const name = normalizeSearchText(this.filterName);
     const ip = normalizeSearchText(this.filterIp);
     const vendor = normalizeSearchText(this.filterVendor);
     const type = normalizeSearchText(this.filterType);
+    const deviceGroup = normalizeSearchText(this.filterDeviceGroup);
     const status = this.filterStatus;
     this.filteredHosts.set(
       this.hosts().filter((h) =>
@@ -612,6 +776,7 @@ export class HostListComponent implements OnInit, OnDestroy {
         matchesSearchText(h.ip, ip) &&
         matchesSearchText(h.vendor, vendor) &&
         matchesSearchText(h.type, type) &&
+        (!deviceGroup || (h.deviceGroups ?? []).some((group) => matchesSearchText(group.name, deviceGroup))) &&
         (!status || h.icmpStatus === status)
       ),
     );
@@ -655,6 +820,10 @@ export class HostListComponent implements OnInit, OnDestroy {
     this.expandedHostIds.update((ids) =>
       ids.includes(hostId) ? ids.filter((item) => item !== hostId) : [...ids, hostId],
     );
+  }
+
+  protected hasExpandableInterfaces(host: DeviceDto) {
+    return !!host.snmpInterfaces?.length;
   }
 
   protected isExpanded(hostId: string) {

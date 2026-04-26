@@ -36,6 +36,7 @@ interface DeviceTypeCatalogItem {
           (ngModelChange)="onVendorChange()"
           [ngModelOptions]="{ standalone: true }"
           [options]="vendors()"
+          [compact]="true"
           placeholder="Select vendor"
           metaText="Catalog search without diacritics"
           searchPlaceholder="Search vendor"
@@ -50,6 +51,7 @@ interface DeviceTypeCatalogItem {
           [(ngModel)]="form.type"
           [ngModelOptions]="{ standalone: true }"
           [options]="deviceTypes()"
+          [compact]="true"
           placeholder="Select device type"
           metaText="Filter available types instantly"
           searchPlaceholder="Search device type"
@@ -137,6 +139,7 @@ interface DeviceTypeCatalogItem {
           [ngModelOptions]="{ standalone: true }"
           [options]="deviceGroups()"
           [multiple]="true"
+          [compact]="true"
           placeholder="Select device groups"
           metaText="Multi-select with fulltext search"
           searchPlaceholder="Search device groups"
@@ -184,6 +187,11 @@ interface DeviceTypeCatalogItem {
         background: #fff;
         transition: border-color 0.15s;
         outline: none;
+      }
+      .form-group select {
+        padding: 8px 12px;
+        min-height: 38px;
+        font-size: 0.84rem;
       }
       .form-group input[type="text"]:focus,
       .form-group input[type="number"]:focus,
@@ -236,6 +244,44 @@ interface DeviceTypeCatalogItem {
         border: 1px solid #fecaca;
         border-radius: 10px;
         color: #dc2626;
+      }
+
+      .form-actions {
+        display: flex;
+        gap: 10px;
+        justify-content: flex-end;
+        padding-top: 8px;
+        border-top: 1px solid #f1f5f9;
+      }
+      .btn {
+        display: inline-flex;
+        align-items: center;
+        padding: 10px 20px;
+        border: none;
+        border-radius: 10px;
+        font-weight: 600;
+        font-size: 0.88rem;
+        cursor: pointer;
+        font-family: inherit;
+        transition: background 0.15s, opacity 0.15s;
+      }
+      .btn-primary {
+        background: #3b82f6;
+        color: #fff;
+      }
+      .btn-primary:hover:not(:disabled) {
+        background: #2563eb;
+      }
+      .btn-primary:disabled {
+        opacity: 0.6;
+        cursor: not-allowed;
+      }
+      .btn-secondary {
+        background: #e2e8f0;
+        color: #475569;
+      }
+      .btn-secondary:hover {
+        background: #cbd5e1;
       }
     `,
   ],

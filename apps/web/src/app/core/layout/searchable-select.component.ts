@@ -4,6 +4,8 @@ import {
   ElementRef,
   HostListener,
   Input,
+  OnChanges,
+  SimpleChanges,
   forwardRef,
   inject,
   signal,
@@ -366,8 +368,10 @@ export interface SearchableSelectOption {
     `,
   ],
 })
-export class SearchableSelectComponent implements ControlValueAccessor {
+export class SearchableSelectComponent implements ControlValueAccessor, OnChanges {
   private readonly elementRef = inject(ElementRef);
+  private readonly optionsVersion = signal(0);
+  private readonly valueVersion = signal(0);
 
   @Input() options: SearchableSelectOption[] = [];
   @Input() placeholder = 'Select';
@@ -391,15 +395,26 @@ export class SearchableSelectComponent implements ControlValueAccessor {
   protected disabled = false;
 
   protected readonly filteredOptions = computed(() => {
+    this.optionsVersion();
     const normalizedQuery = normalizeSearchText(this.query());
     if (!normalizedQuery) return this.options;
     return this.options.filter((option) => matchesSearchText(`${option.label} ${option.description ?? ''}`, normalizedQuery));
   });
 
   protected readonly selectedOptions = computed(() => {
-    const selectedValues = new Set(this.currentValues());
+    this.optionsVersion();
+    this.valueVersion();
+    const selectedValues = new Set(
+      this.multiple ? this.currentValues() : (this.currentValue() ? [this.currentValue()] : []),
+    );
     return this.options.filter((option) => selectedValues.has(option.value));
   });
+
+  ngOnChanges(changes: SimpleChanges): void {
+    if ('options' in changes) {
+      this.optionsVersion.update((version) => version + 1);
+    }
+  }
 
   protected hasSelection(): boolean {
     return this.multiple ? this.currentValues().length > 0 : this.currentValue() !== '';
@@ -431,17 +446,20 @@ export class SearchableSelectComponent implements ControlValueAccessor {
         values.add(option.value);
       }
       this.internalValue = [...values];
+      this.valueVersion.update((version) => version + 1);
       this.onChange(this.internalValue);
       return;
     }
 
     this.internalValue = option.value;
+    this.valueVersion.update((version) => version + 1);
     this.onChange(this.internalValue);
     this.close();
   }
 
   protected selectEmpty() {
     this.internalValue = this.multiple ? [] : '';
+    this.valueVersion.update((version) => version + 1);
     this.onChange(this.internalValue);
     this.close();
   }
@@ -458,9 +476,11 @@ export class SearchableSelectComponent implements ControlValueAccessor {
   writeValue(value: string | string[] | null): void {
     if (this.multiple) {
       this.internalValue = Array.isArray(value) ? value : [];
+      this.valueVersion.update((version) => version + 1);
       return;
     }
     this.internalValue = typeof value === 'string' ? value : '';
+    this.valueVersion.update((version) => version + 1);
   }
 
   registerOnChange(fn: (value: string | string[]) => void): void {

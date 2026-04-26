@@ -83,7 +83,7 @@ function normalizeInterfaces(value: Prisma.JsonValue): DeviceInterfaceDto[] | nu
   return items.length > 0 ? items : [];
 }
 
-function toDeviceDto(device: DeviceView, groupIds: string[]): DeviceDto {
+function toDeviceDto(device: DeviceView, groupIds: string[], deviceGroups: Array<{ id: string; name: string }> = []): DeviceDto {
   return {
     id: device.id,
     name: device.name,
@@ -113,6 +113,7 @@ function toDeviceDto(device: DeviceView, groupIds: string[]): DeviceDto {
     icmpStatus: device.icmpStatus as DeviceDto['icmpStatus'],
     lastPingAt: device.lastPingAt?.toISOString() ?? null,
     lastPingDuration: device.lastPingDuration,
+    deviceGroups,
     groupIds,
   };
 }
@@ -228,6 +229,29 @@ async function mapGroupIds(deviceIds: string[]) {
   return map;
 }
 
+async function mapDeviceGroups(deviceIds: string[]) {
+  const rels = await prisma.deviceGroupDevice.findMany({
+    where: { deviceId: { in: deviceIds } },
+    select: {
+      deviceId: true,
+      deviceGroup: {
+        select: {
+          id: true,
+          name: true,
+        },
+      },
+    },
+  });
+
+  const map = new Map<string, Array<{ id: string; name: string }>>();
+  for (const rel of rels) {
+    const existing = map.get(rel.deviceId) ?? [];
+    existing.push(rel.deviceGroup);
+    map.set(rel.deviceId, existing);
+  }
+  return map;
+}
+
 export async function listDevices(session: NonNullable<SessionUser>, search?: string | null) {
   const userGroupIds = await resolveAllowedGroupIds(session);
   const normalizedSearch = search?.trim();
@@ -330,8 +354,10 @@ export async function listDevices(session: NonNullable<SessionUser>, search?: st
     });
   }
 
-  const groupMap = await mapGroupIds(devices.map((device) => device.id));
-  return devices.map((device) => toDeviceDto(device, groupMap.get(device.id) ?? []));
+  const deviceIds = devices.map((device) => device.id);
+  const groupMap = await mapGroupIds(deviceIds);
+  const deviceGroupMap = await mapDeviceGroups(deviceIds);
+  return devices.map((device) => toDeviceDto(device, groupMap.get(device.id) ?? [], deviceGroupMap.get(device.id) ?? []));
 }
 
 export async function canReadDevice(
@@ -367,6 +393,12 @@ export async function getDeviceById(deviceId: string, session: NonNullable<Sessi
       groups: {
         select: {
           deviceGroupId: true,
+          deviceGroup: {
+            select: {
+              id: true,
+              name: true,
+            },
+          },
         },
       },
       metrics: {
@@ -383,6 +415,60 @@ export async function getDeviceById(deviceId: string, session: NonNullable<Sessi
   if (!(await canReadDevice(device.id, session))) {
     throw new ApiError(403, 'FORBIDDEN', 'Device access denied');
   }
+
+  const icmpHistoryRows = await prisma.deviceMetric.findMany({
+    where: {
+      deviceId: device.id,
+      source: 'icmp',
+      itemKey: { in: ['icmp.status', 'icmp.rtt', 'icmp.packetLoss'] },
+    },
+    orderBy: { recordedAt: 'desc' },
+    take: 2160,
+  });
+
+  const icmpHistoryMap = new Map<string, {
+    recordedAt: string;
+    status: 'UP' | 'DOWN';
+    rttMs: number | null;
+    packetLossPercent: number | null;
+  }>();
+
+  for (const metric of icmpHistoryRows) {
+    const recordedAt = metric.recordedAt.toISOString();
+    const existing = icmpHistoryMap.get(recordedAt) ?? {
+      recordedAt,
+      status: 'DOWN' as const,
+      rttMs: null,
+      packetLossPercent: null,
+    };
+
+    if (metric.itemKey === 'icmp.status') {
+      existing.status = metric.valueText === 'UP' || metric.valueNumeric === 1 ? 'UP' : 'DOWN';
+    }
+
+    if (metric.itemKey === 'icmp.rtt') {
+      existing.rttMs = metric.valueNumeric;
+    }
+
+    if (metric.itemKey === 'icmp.packetLoss') {
+      existing.packetLossPercent = metric.valueNumeric;
+    }
+
+    icmpHistoryMap.set(recordedAt, existing);
+  }
+
+  const icmpHistory = [...icmpHistoryMap.values()]
+    .sort((left, right) => left.recordedAt.localeCompare(right.recordedAt))
+    .slice(-720);
+
+  const metrics = device.metrics.map((metric) => ({
+    itemKey: metric.itemKey,
+    itemName: metric.itemName,
+    valueNumeric: metric.valueNumeric,
+    valueText: metric.valueText,
+    recordedAt: metric.recordedAt.toISOString(),
+    metadata: metric.metadata,
+  }));
 
   return {
     ...toDeviceDto(
@@ -413,8 +499,10 @@ export async function getDeviceById(deviceId: string, session: NonNullable<Sessi
         lastPingDuration: device.lastPingDuration,
       },
       device.groups.map((item) => item.deviceGroupId),
+      device.groups.map((item) => item.deviceGroup),
     ),
-    metrics: device.metrics,
+    metrics,
+    icmpHistory,
   };
 }
 
@@ -444,7 +532,13 @@ export async function createDevice(data: {
     include: { groups: true },
   });
 
-  return toDeviceDto(device, device.groups.map((item) => item.deviceGroupId));
+  const deviceGroups = await prisma.deviceGroup.findMany({
+    where: { id: { in: device.groups.map((item) => item.deviceGroupId) } },
+    select: { id: true, name: true },
+    orderBy: { name: 'asc' },
+  });
+
+  return toDeviceDto(device, device.groups.map((item) => item.deviceGroupId), deviceGroups);
 }
 
 export async function updateDevice(
@@ -531,7 +625,13 @@ export async function updateDevice(
     throw new ApiError(404, 'NOT_FOUND', 'Device not found');
   }
 
-  return toDeviceDto(updated, updated.groups.map((item) => item.deviceGroupId));
+  const deviceGroups = await prisma.deviceGroup.findMany({
+    where: { id: { in: updated.groups.map((item) => item.deviceGroupId) } },
+    select: { id: true, name: true },
+    orderBy: { name: 'asc' },
+  });
+
+  return toDeviceDto(updated, updated.groups.map((item) => item.deviceGroupId), deviceGroups);
 }
 
 export async function deleteDevice(id: string) {

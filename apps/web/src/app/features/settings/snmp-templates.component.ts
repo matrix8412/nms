@@ -3,7 +3,14 @@ import { Component, computed, inject, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { ApiService } from '../../core/http/api.service';
 import { ColumnFilterTriggerComponent } from '../../core/layout/column-filter-trigger.component';
+import { SearchableSelectComponent, type SearchableSelectOption } from '../../core/layout/searchable-select.component';
 import { SlidePanelComponent } from '../../core/layout/slide-panel.component';
+
+interface CatalogItem {
+  id: string;
+  name: string;
+  vendor?: string | null;
+}
 
 interface SnmpTemplateItem {
   id: string;
@@ -11,15 +18,16 @@ interface SnmpTemplateItem {
   deviceType: string | null;
   metricKey: SnmpMetricKey;
   oid: string;
+  intervalSec: number;
   enabled: boolean;
   createdAt: string;
 }
 
-type SnmpMetricKey = 'hostname' | 'softwareVersion' | 'uptime' | 'ifOperStatus' | 'ifName' | 'ifDescription' | 'ifMac';
-type SortField = 'vendor' | 'deviceType' | 'metricKey' | 'oid';
+type SnmpMetricKey = string;
+type SortField = 'vendor' | 'deviceType' | 'metricKey' | 'oid' | 'intervalSec';
 type SortDir = 'asc' | 'desc';
 
-const METRIC_KEY_OPTIONS: Array<{ value: SnmpMetricKey; label: string }> = [
+const METRIC_KEY_OPTIONS: Array<{ value: string; label: string }> = [
   { value: 'hostname', label: 'Hostname' },
   { value: 'softwareVersion', label: 'Software Version' },
   { value: 'uptime', label: 'Uptime' },
@@ -32,7 +40,7 @@ const METRIC_KEY_OPTIONS: Array<{ value: SnmpMetricKey; label: string }> = [
 @Component({
   selector: 'app-snmp-templates',
   standalone: true,
-  imports: [CommonModule, FormsModule, ColumnFilterTriggerComponent, SlidePanelComponent],
+  imports: [CommonModule, FormsModule, ColumnFilterTriggerComponent, SearchableSelectComponent, SlidePanelComponent],
   template: `
     <div class="table-card">
       <div class="table-toolbar">
@@ -84,6 +92,14 @@ const METRIC_KEY_OPTIONS: Array<{ value: SnmpMetricKey; label: string }> = [
                 </button>
               </div>
             </th>
+            <th class="sortable">
+              <div class="header-cell">
+                <button type="button" class="header-sort" (click)="toggleSort('intervalSec')">
+                  Interval
+                  <span class="sort-icon material-icons">{{ getSortIcon('intervalSec') }}</span>
+                </button>
+              </div>
+            </th>
             <th>Status</th>
             <th class="col-actions">Actions</th>
           </tr>
@@ -94,6 +110,7 @@ const METRIC_KEY_OPTIONS: Array<{ value: SnmpMetricKey; label: string }> = [
             <td>{{ item.deviceType || 'Any' }}</td>
             <td>{{ metricKeyLabel(item.metricKey) }}</td>
             <td class="cell-code">{{ item.oid }}</td>
+            <td>{{ formatInterval(item.intervalSec) }}</td>
             <td>
               <span class="status-badge" [class.enabled]="item.enabled">{{ item.enabled ? 'Enabled' : 'Disabled' }}</span>
             </td>
@@ -121,21 +138,47 @@ const METRIC_KEY_OPTIONS: Array<{ value: SnmpMetricKey; label: string }> = [
       <form (ngSubmit)="save()" class="panel-form">
         <label class="form-label">
           Vendor
-          <input class="form-input" [(ngModel)]="form.vendor" name="vendor" placeholder="Leave empty for any vendor" />
+          <app-searchable-select
+            [(ngModel)]="form.vendor"
+            [ngModelOptions]="{ standalone: true }"
+            [options]="vendorOptions()"
+            [compact]="true"
+            placeholder="Any vendor"
+            metaText="Optional vendor scope"
+            searchPlaceholder="Search vendor"
+            emptyOptionLabel="Any vendor"
+            emptyStateLabel="No matching vendors"
+          />
         </label>
         <label class="form-label">
           Device Type
-          <input class="form-input" [(ngModel)]="form.deviceType" name="deviceType" placeholder="Leave empty for any device type" />
+          <app-searchable-select
+            [(ngModel)]="form.deviceType"
+            [ngModelOptions]="{ standalone: true }"
+            [options]="deviceTypeOptions()"
+            [compact]="true"
+            placeholder="Any device type"
+            metaText="Optional device-type scope"
+            searchPlaceholder="Search device type"
+            emptyOptionLabel="Any device type"
+            emptyStateLabel="No matching device types"
+          />
         </label>
         <label class="form-label">
           Metric Key
-          <select class="form-input" [(ngModel)]="form.metricKey" name="metricKey" required>
-            <option *ngFor="let option of metricKeyOptions" [value]="option.value">{{ option.label }}</option>
-          </select>
+          <input class="form-input" list="snmp-metric-key-options" [(ngModel)]="form.metricKey" name="metricKey" required placeholder="hostname or cpuLoad.1m" />
+          <datalist id="snmp-metric-key-options">
+            <option *ngFor="let option of metricKeyOptions()" [value]="option.value">{{ option.label }}</option>
+          </datalist>
+          <span class="form-help">Built-in keys are suggested. New keys are allowed and will be stored as snmp.custom.&lt;metricKey&gt;.</span>
         </label>
         <label class="form-label">
           OID
           <input class="form-input" [(ngModel)]="form.oid" name="oid" required placeholder="1.3.6.1..." />
+        </label>
+        <label class="form-label">
+          Poll Interval (seconds)
+          <input class="form-input" type="number" min="30" max="86400" step="30" [(ngModel)]="form.intervalSec" name="intervalSec" required />
         </label>
         <label class="form-label toggle-row">
           <span>Enabled</span>
@@ -194,6 +237,7 @@ const METRIC_KEY_OPTIONS: Array<{ value: SnmpMetricKey; label: string }> = [
     .panel-form { display: flex; flex-direction: column; gap: 16px; padding: 20px; }
     .form-label { display: flex; flex-direction: column; gap: 6px; font-size: 0.84rem; font-weight: 600; color: #334155; }
     .form-input { padding: 8px 12px; border: 1px solid #e2e8f0; border-radius: 8px; font-size: 0.88rem; font-family: inherit; }
+    .form-help { color: #64748b; font-size: 0.76rem; font-weight: 500; }
     .toggle-row { flex-direction: row; align-items: center; justify-content: space-between; }
     .toggle { width: 20px; height: 20px; accent-color: #3b82f6; }
     .panel-actions { display: flex; gap: 10px; justify-content: flex-end; margin-top: 8px; }
@@ -207,8 +251,9 @@ const METRIC_KEY_OPTIONS: Array<{ value: SnmpMetricKey; label: string }> = [
 export class SnmpTemplatesComponent {
   private readonly api = inject(ApiService);
 
-  protected readonly metricKeyOptions = METRIC_KEY_OPTIONS;
   protected readonly items = signal<SnmpTemplateItem[]>([]);
+  protected readonly vendors = signal<CatalogItem[]>([]);
+  protected readonly deviceTypes = signal<CatalogItem[]>([]);
   protected readonly searchQuery = signal('');
   protected readonly sortField = signal<SortField>('vendor');
   protected readonly sortDir = signal<SortDir>('asc');
@@ -221,12 +266,14 @@ export class SnmpTemplatesComponent {
     deviceType: string;
     metricKey: SnmpMetricKey;
     oid: string;
+    intervalSec: number;
     enabled: boolean;
   } = {
     vendor: '',
     deviceType: '',
     metricKey: 'hostname',
     oid: '',
+    intervalSec: 1800,
     enabled: true,
   };
 
@@ -237,7 +284,7 @@ export class SnmpTemplatesComponent {
     }
 
     return this.items().filter((item) =>
-      [item.vendor ?? '', item.deviceType ?? '', item.metricKey, item.oid].some((value) => value.toLowerCase().includes(query)),
+      [item.vendor ?? '', item.deviceType ?? '', item.metricKey, item.oid, String(item.intervalSec)].some((value) => value.toLowerCase().includes(query)),
     );
   });
 
@@ -246,6 +293,9 @@ export class SnmpTemplatesComponent {
     const field = this.sortField();
     const dir = this.sortDir();
     items.sort((left, right) => {
+      if (field === 'intervalSec') {
+        return left.intervalSec - right.intervalSec;
+      }
       const leftValue = String(left[field] ?? '').toLowerCase();
       const rightValue = String(right[field] ?? '').toLowerCase();
       return leftValue.localeCompare(rightValue, 'sk', { sensitivity: 'base' });
@@ -255,6 +305,7 @@ export class SnmpTemplatesComponent {
 
   constructor() {
     this.loadItems();
+    this.loadCatalogs();
   }
 
   protected toggleSort(field: SortField) {
@@ -271,8 +322,31 @@ export class SnmpTemplatesComponent {
     return this.sortDir() === 'asc' ? 'arrow_upward' : 'arrow_downward';
   }
 
+  protected metricKeyOptions(): Array<{ value: string; label: string }> {
+    const options = [...METRIC_KEY_OPTIONS];
+    for (const item of this.items()) {
+      if (!options.some((option) => option.value === item.metricKey)) {
+        options.push({ value: item.metricKey, label: this.formatMetricKeyLabel(item.metricKey) });
+      }
+    }
+    if (this.form.metricKey && !options.some((option) => option.value === this.form.metricKey)) {
+      options.unshift({ value: this.form.metricKey, label: this.formatMetricKeyLabel(this.form.metricKey) });
+    }
+    return options;
+  }
+
   protected metricKeyLabel(value: SnmpMetricKey) {
-    return this.metricKeyOptions.find((item) => item.value === value)?.label ?? value;
+    return this.metricKeyOptions().find((item) => item.value === value)?.label ?? this.formatMetricKeyLabel(value);
+  }
+
+  protected formatInterval(value: number) {
+    if (value % 3600 === 0) {
+      return `${value / 3600} h`;
+    }
+    if (value % 60 === 0) {
+      return `${value / 60} min`;
+    }
+    return `${value} s`;
   }
 
   protected openCreate() {
@@ -282,6 +356,7 @@ export class SnmpTemplatesComponent {
       deviceType: '',
       metricKey: 'hostname',
       oid: '',
+      intervalSec: 1800,
       enabled: true,
     };
     this.panelOpen.set(true);
@@ -294,6 +369,7 @@ export class SnmpTemplatesComponent {
       deviceType: item.deviceType ?? '',
       metricKey: item.metricKey,
       oid: item.oid,
+      intervalSec: item.intervalSec,
       enabled: item.enabled,
     };
     this.panelOpen.set(true);
@@ -303,8 +379,9 @@ export class SnmpTemplatesComponent {
     const payload = {
       vendor: this.normalizeOptional(this.form.vendor),
       deviceType: this.normalizeOptional(this.form.deviceType),
-      metricKey: this.form.metricKey,
+      metricKey: this.normalizeMetricKey(this.form.metricKey),
       oid: this.form.oid.trim(),
+      intervalSec: Math.max(30, Math.min(86400, Number(this.form.intervalSec) || 1800)),
       enabled: this.form.enabled,
     };
 
@@ -334,6 +411,42 @@ export class SnmpTemplatesComponent {
 
   private loadItems() {
     this.api.getSnmpTemplates().subscribe((res: any) => this.items.set(res.data));
+  }
+
+  private loadCatalogs() {
+    this.api.getVendors().subscribe((res: any) => this.vendors.set(res.data));
+    this.api.getDeviceTypes().subscribe((res: any) => this.deviceTypes.set(res.data));
+  }
+
+  protected vendorOptions(): SearchableSelectOption[] {
+    return this.catalogOptions(this.vendors(), this.form.vendor);
+  }
+
+  protected deviceTypeOptions(): SearchableSelectOption[] {
+    return this.catalogOptions(this.deviceTypes(), this.form.deviceType, (item) => item.vendor || null);
+  }
+
+  private catalogOptions(items: CatalogItem[], currentValue: string, description?: (item: CatalogItem) => string | null): SearchableSelectOption[] {
+    const options = items.map((item) => ({
+      value: item.name,
+      label: item.name,
+      description: description?.(item) ?? null,
+    }));
+    const normalizedCurrent = this.normalizeOptional(currentValue);
+    if (normalizedCurrent && !options.some((option) => option.value === normalizedCurrent)) {
+      options.unshift({ value: normalizedCurrent, label: normalizedCurrent, description: 'Current value' });
+    }
+    return options;
+  }
+
+  private formatMetricKeyLabel(value: string) {
+    return value
+      .replace(/[._-]+/g, ' ')
+      .replace(/\b\w/g, (segment) => segment.toUpperCase());
+  }
+
+  private normalizeMetricKey(value: string) {
+    return value.trim();
   }
 
   private normalizeOptional(value: string) {

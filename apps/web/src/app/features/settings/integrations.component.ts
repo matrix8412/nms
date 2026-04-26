@@ -16,7 +16,7 @@ interface ModuleDef {
   label: string;
   icon: string;
   description: string;
-  fields: { key: string; label: string; type: 'text' | 'password' | 'url' }[];
+  fields: { key: string; label: string; type: 'text' | 'password' | 'url' | 'number' }[];
 }
 
 const MODULES: ModuleDef[] = [
@@ -26,9 +26,10 @@ const MODULES: ModuleDef[] = [
     icon: 'network_ping',
     description: 'Ping devices periodically to monitor availability (UP / DOWN)',
     fields: [
-      { key: 'intervalSec', label: 'Ping Interval (seconds)', type: 'text' },
-      { key: 'timeoutSec', label: 'Timeout (seconds)', type: 'text' },
-      { key: 'retries', label: 'Retries per check', type: 'text' },
+      { key: 'intervalSec', label: 'Ping Interval (seconds)', type: 'number' },
+      { key: 'timeoutSec', label: 'Timeout (seconds)', type: 'number' },
+      { key: 'retries', label: 'Retries per check', type: 'number' },
+      { key: 'historyRetentionDays', label: 'History Retention (days)', type: 'number' },
     ],
   },
   {
@@ -89,8 +90,13 @@ const MODULES: ModuleDef[] = [
         <ng-container *ngFor="let f of m.fields">
           <label class="form-label">
             {{ f.label }}
-            <input class="form-input" [type]="f.type === 'password' ? 'password' : 'text'" [name]="f.key"
-              [ngModel]="formSettings[f.key] ?? ''" (ngModelChange)="formSettings[f.key] = $event" />
+            <input
+              class="form-input"
+              [type]="inputType(f.type)"
+              [name]="f.key"
+              [ngModel]="formSettings[f.key] ?? ''"
+              (ngModelChange)="onFieldChange(f, $event)"
+            />
           </label>
         </ng-container>
         <div class="panel-actions">
@@ -142,7 +148,7 @@ export class IntegrationsComponent implements OnInit {
   protected readonly editingModule = signal<ModuleDef | null>(null);
 
   protected formEnabled = false;
-  protected formSettings: Record<string, string> = {};
+  protected formSettings: Record<string, unknown> = {};
 
   ngOnInit() {
     this.loadConfigs();
@@ -166,14 +172,36 @@ export class IntegrationsComponent implements OnInit {
     const cfg = this.configs().get(m.provider);
     this.editingModule.set(m);
     this.formEnabled = cfg?.enabled ?? false;
-    this.formSettings = { ...(cfg?.settings as Record<string, string> ?? {}) };
+    this.formSettings = { ...((cfg?.settings as Record<string, unknown>) ?? {}) };
     this.panelOpen.set(true);
+  }
+
+  protected inputType(type: ModuleDef['fields'][number]['type']): string {
+    return type === 'password' ? 'password' : type === 'number' ? 'number' : type === 'url' ? 'url' : 'text';
+  }
+
+  protected onFieldChange(field: ModuleDef['fields'][number], value: string) {
+    this.formSettings = {
+      ...this.formSettings,
+      [field.key]: field.type === 'number'
+        ? (value === '' ? '' : Number(value))
+        : value,
+    };
   }
 
   protected saveConfig() {
     const m = this.editingModule();
     if (!m) return;
-    this.api.updateIntegration(m.provider, { enabled: this.formEnabled, settings: this.formSettings }).subscribe(() => {
+    const settings = Object.fromEntries(
+      m.fields.flatMap((field) => {
+        const value = this.formSettings[field.key];
+        if (value === '' || value === null || value === undefined) {
+          return [];
+        }
+        return [[field.key, value]];
+      }),
+    );
+    this.api.updateIntegration(m.provider, { enabled: this.formEnabled, settings }).subscribe(() => {
       this.panelOpen.set(false);
       this.loadConfigs();
     });

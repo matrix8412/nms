@@ -37,6 +37,7 @@ interface IcmpSettings {
   intervalSec: number;
   timeoutSec: number;
   retries: number;
+  historyRetentionDays: number;
 }
 
 const ICMP_DEFAULTS: IcmpSettings = {
@@ -44,7 +45,22 @@ const ICMP_DEFAULTS: IcmpSettings = {
   intervalSec: 120,
   timeoutSec: 3,
   retries: 2,
+  historyRetentionDays: 30,
 };
+
+function readNumericSetting(settings: Record<string, unknown>, key: string, fallback: number): number {
+  const raw = settings[key];
+  if (typeof raw === 'number' && Number.isFinite(raw)) {
+    return raw;
+  }
+  if (typeof raw === 'string' && raw.trim() !== '') {
+    const parsed = Number(raw);
+    if (Number.isFinite(parsed)) {
+      return parsed;
+    }
+  }
+  return fallback;
+}
 
 async function loadIcmpSettings(): Promise<IcmpSettings> {
   try {
@@ -61,9 +77,10 @@ async function loadIcmpSettings(): Promise<IcmpSettings> {
     const s = (config.settings ?? {}) as Record<string, unknown>;
     return {
       enabled: true,
-      intervalSec: typeof s['intervalSec'] === 'number' ? s['intervalSec'] : ICMP_DEFAULTS.intervalSec,
-      timeoutSec: typeof s['timeoutSec'] === 'number' ? s['timeoutSec'] : ICMP_DEFAULTS.timeoutSec,
-      retries: typeof s['retries'] === 'number' ? s['retries'] : ICMP_DEFAULTS.retries,
+      intervalSec: readNumericSetting(s, 'intervalSec', ICMP_DEFAULTS.intervalSec),
+      timeoutSec: readNumericSetting(s, 'timeoutSec', ICMP_DEFAULTS.timeoutSec),
+      retries: readNumericSetting(s, 'retries', ICMP_DEFAULTS.retries),
+      historyRetentionDays: readNumericSetting(s, 'historyRetentionDays', ICMP_DEFAULTS.historyRetentionDays),
     };
   } catch (err) {
     logger.warn({ err }, 'Failed to load ICMP settings from DB – using defaults');
@@ -75,7 +92,12 @@ async function loadIcmpSettings(): Promise<IcmpSettings> {
 
 async function enqueueSyncBatch() {
   const devices = await prisma.device.findMany({
-    where: { zabbixHostId: { not: null } },
+    where: {
+      OR: [
+        { zabbixHostId: { not: null } },
+        { snmpVersion: { not: null } },
+      ],
+    },
     select: { id: true },
   });
 
@@ -119,7 +141,13 @@ async function enqueuePingBatch() {
     devices.map((device: { id: string; ip: string }) =>
       pingQueue.add(
         'ping-device',
-        { deviceId: device.id, ip: device.ip, timeoutSec: icmp.timeoutSec, retries: icmp.retries },
+        {
+          deviceId: device.id,
+          ip: device.ip,
+          timeoutSec: icmp.timeoutSec,
+          retries: icmp.retries,
+          historyRetentionDays: icmp.historyRetentionDays,
+        },
         {
           attempts: 2,
           removeOnComplete: 1000,

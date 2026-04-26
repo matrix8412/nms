@@ -4,6 +4,63 @@ import { ZabbixClient } from './zabbix.js';
 import { env } from './env.js';
 import { pollSnmpDevice } from './snmp.js';
 
+type SnmpTemplateKey = string;
+
+const DEFAULT_SNMP_INTERVAL_SEC = 1800;
+
+async function loadLastSnmpMetricTimes(deviceId: string) {
+  const latestMetrics = await prisma.deviceMetric.findMany({
+    where: {
+      deviceId,
+      source: 'snmp',
+      itemKey: { startsWith: 'snmp.' },
+    },
+    select: {
+      itemKey: true,
+      recordedAt: true,
+    },
+    orderBy: {
+      recordedAt: 'desc',
+    },
+  });
+
+  const timestamps: Partial<Record<SnmpTemplateKey, Date>> = {};
+  for (const metric of latestMetrics) {
+    const templateKey = getMetricTimestampKey(metric.itemKey);
+    if (templateKey && !timestamps[templateKey]) {
+      timestamps[templateKey] = metric.recordedAt;
+    }
+  }
+
+  return timestamps;
+}
+
+function getMetricTimestampKey(itemKey: string): string | null {
+  if (itemKey === 'snmp.hostname') {
+    return 'hostname';
+  }
+  if (itemKey === 'snmp.softwareVersion') {
+    return 'softwareVersion';
+  }
+  if (itemKey === 'snmp.uptimeTicks') {
+    return 'uptime';
+  }
+  if (itemKey.startsWith('snmp.interface.')) {
+    return 'ifOperStatus';
+  }
+  if (itemKey.startsWith('snmp.custom.')) {
+    return itemKey.slice('snmp.custom.'.length) || null;
+  }
+  return null;
+}
+
+function isMetricDue(lastRecordedAt: Date | undefined, intervalSec: number, now: Date) {
+  if (!lastRecordedAt) {
+    return true;
+  }
+  return now.getTime() - lastRecordedAt.getTime() >= intervalSec * 1000;
+}
+
 const DEFAULT_KEYS_BY_TYPE: Record<string, string[]> = {
   default: ['system.cpu.load[percpu,avg1]', 'vm.memory.size[available]', 'icmpping'],
   router: ['net.if.in[ifHCInOctets.1]', 'net.if.out[ifHCOutOctets.1]', 'icmpping'],
@@ -37,7 +94,7 @@ async function resolveItemKeys(vendor?: string | null, deviceType?: string | nul
   );
 }
 
-export async function syncDevice(deviceId: string) {
+export async function syncDevice(deviceId: string, force = false) {
   const device = await prisma.device.findUnique({
     where: { id: deviceId },
     select: {
@@ -113,17 +170,29 @@ export async function syncDevice(deviceId: string) {
         },
       });
 
+      const recordedAt = new Date();
+      const lastSnmpMetricTimes = await loadLastSnmpMetricTimes(device.id);
+
       metrics.push(
-        ...result.metrics.map((item) => ({
-          deviceId: device.id,
-          source: 'snmp',
-          itemKey: item.itemKey,
-          itemName: item.itemName,
-          valueNumeric: item.valueNumeric,
-          valueText: item.valueText,
-          recordedAt: new Date(),
-          metadata: item.metadata,
-        })),
+        ...result.metrics
+          .filter((item) =>
+            force ||
+            isMetricDue(
+              lastSnmpMetricTimes[item.templateKey],
+              result.metricIntervals[item.templateKey] ?? DEFAULT_SNMP_INTERVAL_SEC,
+              recordedAt,
+            ),
+          )
+          .map((item) => ({
+            deviceId: device.id,
+            source: 'snmp',
+            itemKey: item.itemKey,
+            itemName: item.itemName,
+            valueNumeric: item.valueNumeric,
+            valueText: item.valueText,
+            recordedAt,
+            metadata: item.metadata,
+          })),
       );
     } catch (error) {
       const message = error instanceof Error ? error.message : 'SNMP poll failed';

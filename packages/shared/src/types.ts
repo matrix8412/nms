@@ -61,6 +61,7 @@ export type DeviceDto = {
   icmpStatus: IcmpStatus;
   lastPingAt?: string | null;
   lastPingDuration?: number | null;
+  deviceGroups?: Array<{ id: string; name: string }>;
   groupIds: string[];
 };
 

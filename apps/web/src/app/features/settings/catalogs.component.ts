@@ -9,7 +9,7 @@ import { SlidePanelComponent } from '../../core/layout/slide-panel.component';
 import { HostGroupsComponent } from '../hosts/host-groups.component';
 import { SnmpTemplatesComponent } from './snmp-templates.component';
 
-interface CatalogItem { id: string; name: string; createdAt: string; vendor?: string | null; }
+interface CatalogItem { id: string; name: string; createdAt: string; vendor?: string | null; photoDataUrl?: string | null; }
 
 type SortField = 'name' | 'createdAt';
 type SortDir = 'asc' | 'desc';
@@ -69,6 +69,7 @@ type SortDir = 'asc' | 'desc';
               </div>
             </th>
             <th *ngIf="activeTab() === 'device-types'">Vendor</th>
+            <th *ngIf="activeTab() === 'device-types'">Photo</th>
             <th class="sortable">
               <div class="header-cell">
                 <button type="button" class="header-sort" (click)="toggleSort('createdAt')">
@@ -84,6 +85,12 @@ type SortDir = 'asc' | 'desc';
           <tr *ngFor="let item of sortedItems()">
             <td class="cell-name">{{ item.name }}</td>
             <td *ngIf="activeTab() === 'device-types'">{{ item.vendor || 'Any vendor' }}</td>
+            <td *ngIf="activeTab() === 'device-types'" class="cell-photo">
+              <div class="photo-thumb" *ngIf="item.photoDataUrl; else noPhoto">
+                <img [src]="item.photoDataUrl" [alt]="item.name + ' photo'" />
+              </div>
+              <ng-template #noPhoto>—</ng-template>
+            </td>
             <td class="cell-date">{{ item.createdAt | date:'mediumDate' }}</td>
             <td class="col-actions">
               <button class="icon-btn" title="Edit" (click)="openEdit(item)">
@@ -121,6 +128,7 @@ type SortDir = 'asc' | 'desc';
             [(ngModel)]="formVendor"
             [ngModelOptions]="{ standalone: true }"
             [options]="vendorOptions()"
+            [compact]="true"
             placeholder="Any vendor"
             metaText="Optional device-type scope"
             searchPlaceholder="Search vendor"
@@ -128,6 +136,14 @@ type SortDir = 'asc' | 'desc';
             emptyStateLabel="No matching vendors"
           />
         </label>
+        <label class="form-label" *ngIf="activeTab() === 'device-types'">
+          Device Photo
+          <input class="form-input" type="file" accept="image/png,image/jpeg,image/webp,image/gif" (change)="onDeviceTypePhotoSelected($event)" />
+        </label>
+        <div class="photo-preview" *ngIf="activeTab() === 'device-types' && formPhotoDataUrl">
+          <img [src]="formPhotoDataUrl" [alt]="formName || 'Device type photo preview'" />
+          <button type="button" class="btn btn-outline btn-small" (click)="clearDeviceTypePhoto()">Remove photo</button>
+        </div>
         <div class="panel-actions">
           <button type="button" class="btn btn-outline" (click)="panelOpen.set(false)">Cancel</button>
           <button type="submit" class="btn btn-primary">{{ editingItem() ? 'Update' : 'Create' }}</button>
@@ -163,6 +179,7 @@ type SortDir = 'asc' | 'desc';
     .btn-primary:hover { background: #2563eb; }
     .btn-outline { background: #fff; color: #475569; border: 1px solid #e2e8f0; }
     .btn-outline:hover { background: #f8fafc; }
+    .btn-small { padding: 6px 12px; font-size: 0.8rem; }
     .btn-danger { background: #ef4444; color: #fff; }
     .btn-danger:hover { background: #dc2626; }
     .btn .material-icons { font-size: 18px; }
@@ -184,6 +201,9 @@ type SortDir = 'asc' | 'desc';
     .data-table td { padding: 12px 20px; font-size: 0.88rem; color: #334155; border-bottom: 1px solid #f1f5f9; }
     .cell-name { font-weight: 600; color: #1a2332; }
     .cell-date { color: #64748b; font-size: 0.84rem; }
+    .cell-photo { width: 92px; }
+    .photo-thumb { width: 52px; height: 52px; border-radius: 10px; overflow: hidden; border: 1px solid #e2e8f0; background: #f8fafc; display: inline-flex; align-items: center; justify-content: center; }
+    .photo-thumb img { width: 100%; height: 100%; object-fit: cover; display: block; }
     .col-actions { width: 100px; text-align: right; }
 
     .icon-btn { background: none; border: none; cursor: pointer; padding: 4px; border-radius: 6px; color: #64748b; }
@@ -199,6 +219,8 @@ type SortDir = 'asc' | 'desc';
     .form-label { display: flex; flex-direction: column; gap: 6px; font-size: 0.84rem; font-weight: 600; color: #334155; }
     .form-input { padding: 8px 12px; border: 1px solid #e2e8f0; border-radius: 8px; font-size: 0.88rem; }
     .form-input:focus { outline: none; border-color: #3b82f6; box-shadow: 0 0 0 3px rgba(59,130,246,.12); }
+    .photo-preview { display: flex; align-items: center; gap: 12px; padding: 12px; border: 1px dashed #cbd5e1; border-radius: 10px; background: #f8fafc; }
+    .photo-preview img { width: 88px; height: 88px; object-fit: cover; border-radius: 10px; border: 1px solid #e2e8f0; background: #fff; }
     .panel-actions { display: flex; gap: 10px; justify-content: flex-end; margin-top: 8px; }
 
     .modal-overlay { position: fixed; inset: 0; background: rgba(0,0,0,.35); display: flex; align-items: center; justify-content: center; z-index: 200; }
@@ -228,6 +250,7 @@ export class CatalogsComponent implements OnInit {
 
   protected formName = '';
   protected formVendor = '';
+  protected formPhotoDataUrl: string | null = null;
 
   protected readonly filteredItems = computed(() => {
     const q = this.searchQuery().toLowerCase();
@@ -305,6 +328,7 @@ export class CatalogsComponent implements OnInit {
     this.editingItem.set(null);
     this.formName = '';
     this.formVendor = '';
+    this.formPhotoDataUrl = null;
     this.panelOpen.set(true);
   }
 
@@ -312,13 +336,40 @@ export class CatalogsComponent implements OnInit {
     this.editingItem.set(item);
     this.formName = item.name;
     this.formVendor = item.vendor ?? '';
+    this.formPhotoDataUrl = item.photoDataUrl ?? null;
     this.panelOpen.set(true);
+  }
+
+  protected onDeviceTypePhotoSelected(event: Event) {
+    const input = event.target as HTMLInputElement | null;
+    const file = input?.files?.[0];
+    if (!file || !file.type.startsWith('image/')) {
+      if (input) {
+        input.value = '';
+      }
+      return;
+    }
+
+    const reader = new FileReader();
+    reader.onload = () => {
+      this.formPhotoDataUrl = typeof reader.result === 'string' ? reader.result : null;
+      if (input) {
+        input.value = '';
+      }
+    };
+    reader.readAsDataURL(file);
+  }
+
+  protected clearDeviceTypePhoto() {
+    this.formPhotoDataUrl = null;
   }
 
   protected save() {
     const edit = this.editingItem();
     const isVendor = this.activeTab() === 'vendors';
-    const payload = isVendor ? { name: this.formName } : { name: this.formName, vendor: this.formVendor || null };
+    const payload = isVendor
+      ? { name: this.formName }
+      : { name: this.formName, vendor: this.formVendor || null, photoDataUrl: this.formPhotoDataUrl };
 
     const req = edit
       ? (isVendor ? this.api.updateVendor(edit.id, payload) : this.api.updateDeviceType(edit.id, payload))
