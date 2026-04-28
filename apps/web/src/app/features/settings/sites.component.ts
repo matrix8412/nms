@@ -160,6 +160,7 @@ type SortDir = 'asc' | 'desc';
             <small>Click anywhere on the OpenStreetMap layer to update latitude and longitude.</small>
           </div>
           <app-openstreet-map-picker
+            *ngIf="panelOpen()"
             [latitude]="currentLatitude()"
             [longitude]="currentLongitude()"
             (coordinatesChange)="onCoordinatesSelected($event)"

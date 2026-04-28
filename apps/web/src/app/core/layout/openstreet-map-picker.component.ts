@@ -31,6 +31,9 @@ type LeafletCircleMarker = import('leaflet').CircleMarker;
   `,
   styles: [
     `
+      :host {
+        display: block;
+      }
       .map-picker {
         display: flex;
         flex-direction: column;
@@ -72,6 +75,7 @@ export class OpenstreetMapPickerComponent implements AfterViewInit, OnChanges, O
   private leaflet: LeafletModule | null = null;
   private map: LeafletMap | null = null;
   private marker: LeafletCircleMarker | null = null;
+  private invalidateTimers: ReturnType<typeof setTimeout>[] = [];
 
   async ngAfterViewInit() {
     if (!this.mapHost) {
@@ -102,8 +106,7 @@ export class OpenstreetMapPickerComponent implements AfterViewInit, OnChanges, O
     });
 
     this.setMarker(this.latitude, this.longitude, false);
-
-    setTimeout(() => this.map?.invalidateSize(), 0);
+    this.scheduleInvalidate();
   }
 
   ngOnChanges(changes: SimpleChanges) {
@@ -113,10 +116,15 @@ export class OpenstreetMapPickerComponent implements AfterViewInit, OnChanges, O
 
     if (changes['latitude'] || changes['longitude']) {
       this.setMarker(this.latitude, this.longitude, false);
+      this.scheduleInvalidate();
     }
   }
 
   ngOnDestroy() {
+    for (const timer of this.invalidateTimers) {
+      clearTimeout(timer);
+    }
+    this.invalidateTimers = [];
     this.map?.remove();
     this.map = null;
     this.marker = null;
@@ -152,6 +160,22 @@ export class OpenstreetMapPickerComponent implements AfterViewInit, OnChanges, O
 
     if (emit) {
       this.coordinatesChange.emit({ latitude, longitude });
+    }
+  }
+
+  private scheduleInvalidate() {
+    if (!this.map) {
+      return;
+    }
+
+    for (const timer of this.invalidateTimers) {
+      clearTimeout(timer);
+    }
+    this.invalidateTimers = [];
+
+    for (const delay of [0, 120, 320, 500]) {
+      const timer = setTimeout(() => this.map?.invalidateSize(), delay);
+      this.invalidateTimers.push(timer);
     }
   }
 }
