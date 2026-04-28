@@ -1,5 +1,6 @@
 generator client {
-  provider = "prisma-client-js"
+  provider      = "prisma-client-js"
+  binaryTargets = ["native", "debian-openssl-3.0.x"]
 }
 
 datasource db {
@@ -81,6 +82,7 @@ model Device {
   ip               String            @unique
   vendor           String?
   type             String?
+  siteId           String?
   zabbixHostId     String?
   snmpVersion      SnmpVersion?
   snmpPort         Int               @default(161)
@@ -102,8 +104,11 @@ model Device {
   lastPingDuration Float?
   createdAt        DateTime          @default(now())
   updatedAt        DateTime          @updatedAt
+  site             Site?             @relation(fields: [siteId], references: [id], onDelete: SetNull)
   groups           DeviceGroupDevice[]
   metrics          DeviceMetric[]
+
+  @@index([siteId])
 }
 
 model DeviceGroup {
@@ -241,10 +246,27 @@ model ZabbixItemMapping {
 // ── Catalog: Vendors & Device Types ─────────────────────────
 
 model Vendor {
-  id        String   @id @default(cuid())
-  name      String   @unique
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  id          String   @id @default(cuid())
+  name        String   @unique
+  logoDataUrl String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+}
+
+model Site {
+  id                 String   @id @default(cuid())
+  name               String   @unique
+  street             String
+  descriptiveNumber  String
+  orientationNumber  String?
+  zipNumber          String
+  city               String
+  latitude           Float
+  longitude          Float
+  description        String?
+  createdAt          DateTime @default(now())
+  updatedAt          DateTime @updatedAt
+  devices            Device[]
 }
 
 model DeviceType {

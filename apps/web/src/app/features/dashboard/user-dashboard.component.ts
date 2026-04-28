@@ -1,7 +1,6 @@
 import { CommonModule } from '@angular/common';
 import { Component, inject, OnInit, signal } from '@angular/core';
 import { RouterLink } from '@angular/router';
-import { AuthService } from '../../core/auth/auth.service';
 import { ApiService } from '../../core/http/api.service';
 import type { DeviceDto } from '@nms/shared';
 
@@ -10,11 +9,6 @@ import type { DeviceDto } from '@nms/shared';
   standalone: true,
   imports: [CommonModule, RouterLink],
   template: `
-    <div class="page-header">
-      <h1>Dashboard</h1>
-      <p class="subtitle">Welcome back, {{ userName() }}</p>
-    </div>
-
     <!-- Summary Cards -->
     <div class="cards-row">
       <div class="summary-card blue">
@@ -129,21 +123,6 @@ import type { DeviceDto } from '@nms/shared';
   `,
   styles: [
     `
-      .page-header {
-        margin-bottom: 24px;
-      }
-      .page-header h1 {
-        margin: 0 0 4px;
-        font-size: 1.5rem;
-        font-weight: 700;
-        color: #1a2332;
-      }
-      .subtitle {
-        margin: 0;
-        color: #64748b;
-        font-size: 0.9rem;
-      }
-
       /* Summary Cards */
       .cards-row {
         display: grid;
@@ -304,10 +283,8 @@ import type { DeviceDto } from '@nms/shared';
   ],
 })
 export class UserDashboardComponent implements OnInit {
-  private readonly auth = inject(AuthService);
   private readonly api = inject(ApiService);
 
-  protected readonly userName = signal('');
   protected readonly totalHosts = signal(0);
   protected readonly hostsUp = signal(0);
   protected readonly hostsDown = signal(0);
@@ -316,9 +293,6 @@ export class UserDashboardComponent implements OnInit {
   protected readonly recentEvents = signal<{ action: string; userEmail: string | null; createdAt: string }[]>([]);
 
   ngOnInit() {
-    const user = this.auth.currentUser();
-    this.userName.set(user?.email.split('@')[0] ?? '');
-
     this.api.getDevices().subscribe({
       next: (res) => {
         const devices = res.data;

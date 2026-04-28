@@ -12,6 +12,7 @@ interface DeviceTypeCatalogItem {
   name: string;
   vendor?: string | null;
 }
+interface SiteOption extends SearchableSelectOption {}
 
 @Component({
   selector: 'app-host-form',
@@ -57,6 +58,21 @@ interface DeviceTypeCatalogItem {
           searchPlaceholder="Search device type"
           emptyOptionLabel="No device type"
           emptyStateLabel="No matching device types"
+        />
+      </div>
+
+      <div class="form-group">
+        <label>Site</label>
+        <app-searchable-select
+          [(ngModel)]="form.siteId"
+          [ngModelOptions]="{ standalone: true }"
+          [options]="sites()"
+          [compact]="true"
+          placeholder="Select site"
+          metaText="Assign one physical site to the host"
+          searchPlaceholder="Search site"
+          emptyOptionLabel="No site"
+          emptyStateLabel="No matching sites"
         />
       </div>
 
@@ -298,6 +314,7 @@ export class HostFormComponent implements OnInit {
   protected readonly vendors = signal<SearchableSelectOption[]>([]);
   protected readonly deviceTypes = signal<SearchableSelectOption[]>([]);
   private readonly allDeviceTypes = signal<DeviceTypeCatalogItem[]>([]);
+  protected readonly sites = signal<SiteOption[]>([]);
   protected readonly deviceGroups = signal<DeviceGroupOption[]>([]);
 
   protected form = {
@@ -305,6 +322,7 @@ export class HostFormComponent implements OnInit {
     ip: '',
     vendor: '',
     type: '',
+    siteId: '',
     zabbixHostId: '',
     snmpVersion: '',
     snmpPort: 161,
@@ -324,6 +342,7 @@ export class HostFormComponent implements OnInit {
         ip: this.host.ip,
         vendor: this.host.vendor ?? '',
         type: this.host.type ?? '',
+        siteId: this.host.siteId ?? '',
         zabbixHostId: this.host.zabbixHostId ?? '',
         snmpVersion: this.host.snmp?.version ?? '',
         snmpPort: this.host.snmp?.port ?? 161,
@@ -351,6 +370,19 @@ export class HostFormComponent implements OnInit {
       },
     });
 
+    this.api.getSites().subscribe({
+      next: (res) => {
+        const options = this.sortByLabel(
+          res.data.map((site) => ({
+            value: site.id,
+            label: site.name,
+            description: `${site.street} ${site.descriptiveNumber}${site.orientationNumber ? '/' + site.orientationNumber : ''}, ${site.zipNumber} ${site.city}`,
+          })),
+        );
+        this.sites.set(options);
+      },
+    });
+
     this.api.getDeviceGroups().subscribe({
       next: (res) => {
         const groups = (res.data as Array<{ id: string; name: string; description?: string | null }>).map((group) => ({
@@ -374,6 +406,7 @@ export class HostFormComponent implements OnInit {
       ip: this.form.ip.trim(),
       vendor: this.form.vendor.trim() || null,
       type: this.form.type.trim() || null,
+      siteId: this.form.siteId || null,
       zabbixHostId: this.form.zabbixHostId.trim() || null,
       snmp,
       deviceGroupIds: this.form.deviceGroupIds,

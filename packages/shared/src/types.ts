@@ -43,12 +43,29 @@ export type DeviceInterfaceDto = {
   operStatus?: string | null;
 };
 
+export type SiteDto = {
+  id: string;
+  name: string;
+  street: string;
+  descriptiveNumber: string;
+  orientationNumber?: string | null;
+  zipNumber: string;
+  city: string;
+  latitude: number;
+  longitude: number;
+  description?: string | null;
+  createdAt: string;
+  updatedAt: string;
+};
+
 export type DeviceDto = {
   id: string;
   name: string;
   ip: string;
   vendor?: string | null;
   type?: string | null;
+  siteId?: string | null;
+  site?: SiteDto | null;
   zabbixHostId?: string | null;
   snmp?: DeviceSnmpDto | null;
   snmpStatus: SnmpStatus;

@@ -10,7 +10,7 @@ import { matchesSearchText, normalizeSearchText } from '../../core/utils/search.
 import { HostFormComponent } from './host-form.component';
 import type { DeviceDto } from '@nms/shared';
 
-type SortField = 'icmpStatus' | 'name' | 'ip' | 'vendor' | 'type' | 'zabbixHostId';
+type SortField = 'icmpStatus' | 'name' | 'ip' | 'vendor' | 'type' | 'site' | 'zabbixHostId';
 type SortDir = 'asc' | 'desc';
 
 @Component({
@@ -137,6 +137,27 @@ type SortDir = 'asc' | 'desc';
                   </button>
                 </div>
               </th>
+              <th class="sortable">
+                <div class="header-cell">
+                  <button type="button" class="header-sort" (click)="toggleSort('site')">
+                    Site
+                    <span class="sort-icon material-icons">{{ getSortIcon('site') }}</span>
+                  </button>
+                  <app-column-filter-trigger [active]="!!filterSite" label="Filter site">
+                    <app-searchable-select
+                      [(ngModel)]="filterSite"
+                      (ngModelChange)="applyFilter()"
+                      [ngModelOptions]="{ standalone: true }"
+                      [options]="siteOptions()"
+                      placeholder="All"
+                      searchPlaceholder="Search site"
+                      emptyOptionLabel="All"
+                      emptyStateLabel="No matching sites"
+                      [compact]="true"
+                    />
+                  </app-column-filter-trigger>
+                </div>
+              </th>
               <th class="actions-col">Actions</th>
             </tr>
           </thead>
@@ -199,6 +220,10 @@ type SortDir = 'asc' | 'desc';
                   <ng-template #noDeviceGroups>—</ng-template>
                 </td>
                 <td class="mono">{{ host.zabbixHostId || '—' }}</td>
+                <td>
+                  <span class="type-badge" *ngIf="host.site">{{ host.site.name }}</span>
+                  <span *ngIf="!host.site">—</span>
+                </td>
                 <td class="actions-col">
                   <button class="icon-btn" title="View" (click)="viewHost(host)">
                     <span class="material-icons">visibility</span>
@@ -212,7 +237,7 @@ type SortDir = 'asc' | 'desc';
                 </td>
               </tr>
               <tr *ngIf="isExpanded(host.id)" class="interface-row">
-                <td colspan="9" class="interface-cell">
+                <td colspan="10" class="interface-cell">
                   <div class="interface-panel">
                     <div class="interface-panel-header">
                       <div>
@@ -273,10 +298,10 @@ type SortDir = 'asc' | 'desc';
               </tr>
             </ng-container>
             <tr *ngIf="sortedHosts().length === 0 && !loading()">
-              <td colspan="9" class="empty">No hosts matching your filters.</td>
+              <td colspan="10" class="empty">No hosts matching your filters.</td>
             </tr>
             <tr *ngIf="loading()">
-              <td colspan="9" class="empty">Loading...</td>
+              <td colspan="10" class="empty">Loading...</td>
             </tr>
           </tbody>
         </table>
@@ -672,6 +697,7 @@ export class HostListComponent implements OnInit, OnDestroy {
   protected filterVendor = '';
   protected filterType = '';
   protected filterDeviceGroup = '';
+  protected filterSite = '';
   protected filterStatus = '';
   protected readonly loading = signal(true);
   protected readonly hosts = signal<DeviceDto[]>([]);
@@ -681,6 +707,7 @@ export class HostListComponent implements OnInit, OnDestroy {
 
   protected readonly availableTypes = signal<string[]>([]);
   protected readonly availableDeviceGroups = signal<string[]>([]);
+  protected readonly availableSites = signal<string[]>([]);
   protected readonly filteredHosts = signal<DeviceDto[]>([]);
   protected readonly expandedHostIds = signal<string[]>([]);
   protected readonly typeOptions = computed<SearchableSelectOption[]>(() =>
@@ -688,6 +715,9 @@ export class HostListComponent implements OnInit, OnDestroy {
   );
   protected readonly deviceGroupOptions = computed<SearchableSelectOption[]>(() =>
     this.availableDeviceGroups().map((group) => ({ value: group, label: group })),
+  );
+  protected readonly siteOptions = computed<SearchableSelectOption[]>(() =>
+    this.availableSites().map((site) => ({ value: site, label: site })),
   );
 
   protected readonly sortField = signal<SortField | ''>('');
@@ -699,8 +729,8 @@ export class HostListComponent implements OnInit, OnDestroy {
     const dir = this.sortDir();
     if (!field) return items;
     const sorted = [...items].sort((a, b) => {
-      const aVal = (a[field] ?? '').toString().toLowerCase();
-      const bVal = (b[field] ?? '').toString().toLowerCase();
+      const aVal = this.getSortValue(a, field);
+      const bVal = this.getSortValue(b, field);
       return aVal.localeCompare(bVal);
     });
     return dir === 'desc' ? sorted.reverse() : sorted;
@@ -726,6 +756,7 @@ export class HostListComponent implements OnInit, OnDestroy {
         this.hosts.set(res.data);
         this.extractTypes(res.data);
         this.extractDeviceGroups(res.data);
+        this.extractSites(res.data);
         this.applyFilter();
         this.loading.set(false);
       },
@@ -740,6 +771,7 @@ export class HostListComponent implements OnInit, OnDestroy {
         this.hosts.set(res.data);
         this.extractTypes(res.data);
         this.extractDeviceGroups(res.data);
+        this.extractSites(res.data);
         this.applyFilter();
       },
     });
@@ -763,12 +795,23 @@ export class HostListComponent implements OnInit, OnDestroy {
     this.availableDeviceGroups.set([...groups].sort());
   }
 
+  private extractSites(devices: DeviceDto[]) {
+    const sites = new Set<string>();
+    for (const device of devices) {
+      if (device.site?.name) {
+        sites.add(device.site.name);
+      }
+    }
+    this.availableSites.set([...sites].sort());
+  }
+
   protected applyFilter() {
     const name = normalizeSearchText(this.filterName);
     const ip = normalizeSearchText(this.filterIp);
     const vendor = normalizeSearchText(this.filterVendor);
     const type = normalizeSearchText(this.filterType);
     const deviceGroup = normalizeSearchText(this.filterDeviceGroup);
+    const site = normalizeSearchText(this.filterSite);
     const status = this.filterStatus;
     this.filteredHosts.set(
       this.hosts().filter((h) =>
@@ -777,6 +820,7 @@ export class HostListComponent implements OnInit, OnDestroy {
         matchesSearchText(h.vendor, vendor) &&
         matchesSearchText(h.type, type) &&
         (!deviceGroup || (h.deviceGroups ?? []).some((group) => matchesSearchText(group.name, deviceGroup))) &&
+        matchesSearchText(h.site?.name, site) &&
         (!status || h.icmpStatus === status)
       ),
     );
@@ -794,6 +838,27 @@ export class HostListComponent implements OnInit, OnDestroy {
   protected getSortIcon(field: SortField): string {
     if (this.sortField() !== field) return 'unfold_more';
     return this.sortDir() === 'asc' ? 'arrow_upward' : 'arrow_downward';
+  }
+
+  private getSortValue(host: DeviceDto, field: SortField): string {
+    switch (field) {
+      case 'icmpStatus':
+        return (host.icmpStatus ?? '').toString().toLowerCase();
+      case 'name':
+        return (host.name ?? '').toString().toLowerCase();
+      case 'ip':
+        return (host.ip ?? '').toString().toLowerCase();
+      case 'vendor':
+        return (host.vendor ?? '').toString().toLowerCase();
+      case 'type':
+        return (host.type ?? '').toString().toLowerCase();
+      case 'site':
+        return (host.site?.name ?? '').toString().toLowerCase();
+      case 'zabbixHostId':
+        return (host.zabbixHostId ?? '').toString().toLowerCase();
+      default:
+        return '';
+    }
   }
 
   protected openAddPanel() {

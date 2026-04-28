@@ -1,6 +1,6 @@
 import { Prisma, prisma } from '@nms/db';
 import { encryptSecret } from '@nms/shared/secrets';
-import type { DeviceDto, DeviceInterfaceDto } from '@nms/shared';
+import type { DeviceDto, DeviceInterfaceDto, SiteDto } from '@nms/shared';
 import type { SessionUser } from '@/lib/auth/session';
 import { env } from '@/lib/env';
 import { ApiError } from '@/lib/errors';
@@ -22,6 +22,7 @@ type DeviceView = {
   ip: string;
   vendor: string | null;
   type: string | null;
+  siteId: string | null;
   zabbixHostId: string | null;
   snmpVersion: 'V2C' | 'V3' | null;
   snmpPort: number;
@@ -42,6 +43,42 @@ type DeviceView = {
   lastPingAt: Date | null;
   lastPingDuration: number | null;
 };
+
+type DeviceSiteRecord = {
+  id: string;
+  name: string;
+  street: string;
+  descriptiveNumber: string;
+  orientationNumber: string | null;
+  zipNumber: string;
+  city: string;
+  latitude: number;
+  longitude: number;
+  description: string | null;
+  createdAt: Date;
+  updatedAt: Date;
+};
+
+function toSiteDto(site: DeviceSiteRecord | null | undefined): SiteDto | null {
+  if (!site) {
+    return null;
+  }
+
+  return {
+    id: site.id,
+    name: site.name,
+    street: site.street,
+    descriptiveNumber: site.descriptiveNumber,
+    orientationNumber: site.orientationNumber,
+    zipNumber: site.zipNumber,
+    city: site.city,
+    latitude: site.latitude,
+    longitude: site.longitude,
+    description: site.description,
+    createdAt: site.createdAt.toISOString(),
+    updatedAt: site.updatedAt.toISOString(),
+  };
+}
 
 function encryptOptionalSecret(value: string | null | undefined): string | null {
   if (!value) {
@@ -83,13 +120,20 @@ function normalizeInterfaces(value: Prisma.JsonValue): DeviceInterfaceDto[] | nu
   return items.length > 0 ? items : [];
 }
 
-function toDeviceDto(device: DeviceView, groupIds: string[], deviceGroups: Array<{ id: string; name: string }> = []): DeviceDto {
+function toDeviceDto(
+  device: DeviceView,
+  groupIds: string[],
+  deviceGroups: Array<{ id: string; name: string }> = [],
+  site: SiteDto | null = null,
+): DeviceDto {
   return {
     id: device.id,
     name: device.name,
     ip: device.ip,
     vendor: device.vendor,
     type: device.type,
+    siteId: device.siteId,
+    site,
     zabbixHostId: device.zabbixHostId,
     snmp: device.snmpVersion
       ? {
@@ -252,6 +296,35 @@ async function mapDeviceGroups(deviceIds: string[]) {
   return map;
 }
 
+async function mapSites(deviceIds: string[]) {
+  const devices = await prisma.device.findMany({
+    where: { id: { in: deviceIds } },
+    select: {
+      id: true,
+      site: true,
+    },
+  });
+
+  return new Map<string, SiteDto | null>(
+    devices.map((device) => [device.id, toSiteDto(device.site as DeviceSiteRecord | null)]),
+  );
+}
+
+async function assertSiteExists(siteId: string | null | undefined) {
+  if (!siteId) {
+    return;
+  }
+
+  const site = await prisma.site.findUnique({
+    where: { id: siteId },
+    select: { id: true },
+  });
+
+  if (!site) {
+    throw new ApiError(400, 'BAD_REQUEST', 'Selected site does not exist');
+  }
+}
+
 export async function listDevices(session: NonNullable<SessionUser>, search?: string | null) {
   const userGroupIds = await resolveAllowedGroupIds(session);
   const normalizedSearch = search?.trim();
@@ -266,6 +339,7 @@ export async function listDevices(session: NonNullable<SessionUser>, search?: st
       >(
         Prisma.sql`
           SELECT d."id", d."name", d."ip", d."vendor", d."type", d."zabbixHostId",
+                 d."siteId",
                  d."snmpVersion"::text, d."snmpPort", d."snmpUsername",
                  d."snmpAuthProtocol"::text, d."snmpPrivProtocol"::text, d."snmpCommunity",
                  d."snmpAuthPassword", d."snmpPrivPassword", d."snmpStatus"::text,
@@ -277,6 +351,15 @@ export async function listDevices(session: NonNullable<SessionUser>, search?: st
              OR unaccent(lower(d."ip")) LIKE unaccent(lower(${searchPattern}))
              OR unaccent(lower(COALESCE(d."vendor", ''))) LIKE unaccent(lower(${searchPattern}))
              OR unaccent(lower(COALESCE(d."type", ''))) LIKE unaccent(lower(${searchPattern}))
+             OR EXISTS (
+               SELECT 1
+               FROM "Site" s
+               WHERE s."id" = d."siteId"
+                 AND (
+                   unaccent(lower(s."name")) LIKE unaccent(lower(${searchPattern}))
+                   OR unaccent(lower(COALESCE(s."city", ''))) LIKE unaccent(lower(${searchPattern}))
+                 )
+             )
           ORDER BY d."name" ASC
         `,
       );
@@ -286,6 +369,7 @@ export async function listDevices(session: NonNullable<SessionUser>, search?: st
       >(
         Prisma.sql`
           SELECT DISTINCT d."id", d."name", d."ip", d."vendor", d."type", d."zabbixHostId",
+                 d."siteId",
                  d."snmpVersion"::text, d."snmpPort", d."snmpUsername",
                  d."snmpAuthProtocol"::text, d."snmpPrivProtocol"::text, d."snmpCommunity",
                  d."snmpAuthPassword", d."snmpPrivPassword", d."snmpStatus"::text,
@@ -301,6 +385,15 @@ export async function listDevices(session: NonNullable<SessionUser>, search?: st
               OR unaccent(lower(d."ip")) LIKE unaccent(lower(${searchPattern}))
               OR unaccent(lower(COALESCE(d."vendor", ''))) LIKE unaccent(lower(${searchPattern}))
               OR unaccent(lower(COALESCE(d."type", ''))) LIKE unaccent(lower(${searchPattern}))
+              OR EXISTS (
+                SELECT 1
+                FROM "Site" s
+                WHERE s."id" = d."siteId"
+                  AND (
+                    unaccent(lower(s."name")) LIKE unaccent(lower(${searchPattern}))
+                    OR unaccent(lower(COALESCE(s."city", ''))) LIKE unaccent(lower(${searchPattern}))
+                  )
+              )
             )
           ORDER BY d."name" ASC
         `,
@@ -330,6 +423,7 @@ export async function listDevices(session: NonNullable<SessionUser>, search?: st
         ip: true,
         vendor: true,
         type: true,
+        siteId: true,
         zabbixHostId: true,
         snmpVersion: true,
         snmpPort: true,
@@ -349,6 +443,7 @@ export async function listDevices(session: NonNullable<SessionUser>, search?: st
         icmpStatus: true,
         lastPingAt: true,
         lastPingDuration: true,
+        site: true,
       },
       orderBy: { name: 'asc' },
     });
@@ -357,7 +452,8 @@ export async function listDevices(session: NonNullable<SessionUser>, search?: st
   const deviceIds = devices.map((device) => device.id);
   const groupMap = await mapGroupIds(deviceIds);
   const deviceGroupMap = await mapDeviceGroups(deviceIds);
-  return devices.map((device) => toDeviceDto(device, groupMap.get(device.id) ?? [], deviceGroupMap.get(device.id) ?? []));
+  const siteMap = await mapSites(deviceIds);
+  return devices.map((device) => toDeviceDto(device, groupMap.get(device.id) ?? [], deviceGroupMap.get(device.id) ?? [], siteMap.get(device.id) ?? null));
 }
 
 export async function canReadDevice(
@@ -390,6 +486,7 @@ export async function getDeviceById(deviceId: string, session: NonNullable<Sessi
   const device = await prisma.device.findUnique({
     where: { id: deviceId },
     include: {
+      site: true,
       groups: {
         select: {
           deviceGroupId: true,
@@ -478,6 +575,7 @@ export async function getDeviceById(deviceId: string, session: NonNullable<Sessi
         ip: device.ip,
         vendor: device.vendor,
         type: device.type,
+        siteId: device.siteId,
         zabbixHostId: device.zabbixHostId,
         snmpVersion: device.snmpVersion,
         snmpPort: device.snmpPort,
@@ -500,6 +598,7 @@ export async function getDeviceById(deviceId: string, session: NonNullable<Sessi
       },
       device.groups.map((item) => item.deviceGroupId),
       device.groups.map((item) => item.deviceGroup),
+      toSiteDto(device.site as DeviceSiteRecord | null),
     ),
     metrics,
     icmpHistory,
@@ -511,16 +610,20 @@ export async function createDevice(data: {
   ip: string;
   vendor?: string | null;
   type?: string | null;
+  siteId?: string | null;
   zabbixHostId?: string | null;
   snmp?: DeviceSnmpInput | null;
   deviceGroupIds: string[];
 }) {
+  await assertSiteExists(data.siteId);
+
   const device = await prisma.device.create({
     data: {
       name: data.name,
       ip: data.ip,
       vendor: data.vendor,
       type: data.type,
+      siteId: data.siteId,
       zabbixHostId: data.zabbixHostId,
       ...buildSnmpCreateData(data.snmp),
       groups: {
@@ -529,7 +632,7 @@ export async function createDevice(data: {
         })),
       },
     },
-    include: { groups: true },
+    include: { groups: true, site: true },
   });
 
   const deviceGroups = await prisma.deviceGroup.findMany({
@@ -538,7 +641,7 @@ export async function createDevice(data: {
     orderBy: { name: 'asc' },
   });
 
-  return toDeviceDto(device, device.groups.map((item) => item.deviceGroupId), deviceGroups);
+  return toDeviceDto(device, device.groups.map((item) => item.deviceGroupId), deviceGroups, toSiteDto(device.site as DeviceSiteRecord | null));
 }
 
 export async function updateDevice(
@@ -548,11 +651,16 @@ export async function updateDevice(
     ip: string;
     vendor?: string | null;
     type?: string | null;
+    siteId?: string | null;
     zabbixHostId?: string | null;
     snmp?: DeviceSnmpInput | null;
     deviceGroupIds: string[];
   }>,
 ) {
+  if (data.siteId !== undefined) {
+    await assertSiteExists(data.siteId);
+  }
+
   const existing = await prisma.device.findUnique({
     where: { id },
     select: {
@@ -561,6 +669,7 @@ export async function updateDevice(
       ip: true,
       vendor: true,
       type: true,
+      siteId: true,
       zabbixHostId: true,
       snmpVersion: true,
       snmpPort: true,
@@ -595,6 +704,7 @@ export async function updateDevice(
         ip: data.ip,
         vendor: data.vendor,
         type: data.type,
+        siteId: data.siteId,
         zabbixHostId: data.zabbixHostId,
         ...resolveSnmpUpdateData(existing, data.snmp),
       },
@@ -618,7 +728,7 @@ export async function updateDevice(
 
   const updated = await prisma.device.findUnique({
     where: { id },
-    include: { groups: true },
+    include: { groups: true, site: true },
   });
 
   if (!updated) {
@@ -631,7 +741,7 @@ export async function updateDevice(
     orderBy: { name: 'asc' },
   });
 
-  return toDeviceDto(updated, updated.groups.map((item) => item.deviceGroupId), deviceGroups);
+  return toDeviceDto(updated, updated.groups.map((item) => item.deviceGroupId), deviceGroups, toSiteDto(updated.site as DeviceSiteRecord | null));
 }
 
 export async function deleteDevice(id: string) {

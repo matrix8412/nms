@@ -69,6 +69,22 @@ import type { DeviceDto } from '@nms/shared';
             </span>
           </div>
           <div class="info-row">
+            <span class="info-label">Site</span>
+            <span class="info-value">{{ host()!.site?.name || 'â€”' }}</span>
+          </div>
+          <div class="info-row" *ngIf="host()!.site">
+            <span class="info-label">Site Address</span>
+            <span class="info-value">{{ formatSiteAddress() }}</span>
+          </div>
+          <div class="info-row" *ngIf="host()!.site">
+            <span class="info-label">Coordinates</span>
+            <span class="info-value mono">{{ host()!.site!.latitude.toFixed(6) }}, {{ host()!.site!.longitude.toFixed(6) }}</span>
+          </div>
+          <div class="info-row" *ngIf="host()!.site?.description">
+            <span class="info-label">Site Description</span>
+            <span class="info-value">{{ host()!.site!.description }}</span>
+          </div>
+          <div class="info-row">
             <span class="info-label">Zabbix Host ID</span>
             <span class="info-value mono">{{ host()!.zabbixHostId || 'Not linked' }}</span>
           </div>
@@ -531,5 +547,14 @@ export class HostDetailComponent implements OnInit {
     const seconds = totalSeconds % 60;
     const dayPart = days > 0 ? `${days}d ` : '';
     return `${dayPart}${hours}h ${minutes}m ${seconds}s`.trim();
+  }
+
+  protected formatSiteAddress() {
+    const site = this.host()?.site;
+    if (!site) {
+      return '—';
+    }
+
+    return `${site.street} ${site.descriptiveNumber}${site.orientationNumber ? `/${site.orientationNumber}` : ''}, ${site.zipNumber} ${site.city}`;
   }
 }

@@ -7,17 +7,16 @@ import { assertCsrf } from '@/lib/auth/csrf';
 import { z } from 'zod';
 import type { NextRequest } from 'next/server';
 
-const imageDataUrlSchema = z
-  .string()
-  .trim()
-  .regex(/^data:image\/(png|jpeg|jpg|webp|gif);base64,[a-zA-Z0-9+/=\r\n]+$/, 'Invalid image format')
-  .max(3_000_000, 'Image is too large')
-  .optional()
-  .nullable();
-
-const updateSchema = z.object({
+const siteSchema = z.object({
   name: z.string().trim().min(1).max(120),
-  logoDataUrl: imageDataUrlSchema,
+  street: z.string().trim().min(1).max(120),
+  descriptiveNumber: z.string().trim().min(1).max(40),
+  orientationNumber: z.string().trim().max(40).optional().nullable(),
+  zipNumber: z.string().trim().min(1).max(20),
+  city: z.string().trim().min(1).max(120),
+  latitude: z.coerce.number().min(-90).max(90),
+  longitude: z.coerce.number().min(-180).max(180),
+  description: z.string().trim().max(1000).optional().nullable(),
 });
 
 type Params = { params: Promise<{ id: string }> };
@@ -27,15 +26,16 @@ export async function PATCH(request: NextRequest, { params }: Params) {
     const { id } = await params;
     const session = await requireAdmin(request);
     assertCsrf(request, session.csrfSecret);
-    const { name, logoDataUrl } = await parseBody(request, updateSchema);
-    const vendor = await prisma.vendor.update({
+    const payload = await parseBody(request, siteSchema);
+    const site = await prisma.site.update({
       where: { id },
       data: {
-        name,
-        logoDataUrl: logoDataUrl || null,
+        ...payload,
+        orientationNumber: payload.orientationNumber || null,
+        description: payload.description || null,
       },
     });
-    return ok({ data: vendor });
+    return ok({ data: site });
   });
 }
 
@@ -44,7 +44,7 @@ export async function DELETE(request: NextRequest, { params }: Params) {
     const { id } = await params;
     const session = await requireAdmin(request);
     assertCsrf(request, session.csrfSecret);
-    await prisma.vendor.delete({ where: { id } });
+    await prisma.site.delete({ where: { id } });
     return ok({ ok: true });
   });
 }

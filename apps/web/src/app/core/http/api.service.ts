@@ -1,6 +1,6 @@
 import { Injectable, inject } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
-import type { DeviceDto, GroupDto } from '@nms/shared';
+import type { DeviceDto, GroupDto, SiteDto } from '@nms/shared';
 
 @Injectable({ providedIn: 'root' })
 export class ApiService {
@@ -29,6 +29,7 @@ export class ApiService {
     ip: string;
     vendor?: string | null;
     type?: string | null;
+    siteId?: string | null;
     zabbixHostId?: string | null;
     snmp?: {
       version: 'V2C' | 'V3';
@@ -52,6 +53,7 @@ export class ApiService {
       ip?: string;
       vendor?: string | null;
       type?: string | null;
+      siteId?: string | null;
       zabbixHostId?: string | null;
       snmp?: {
         version: 'V2C' | 'V3';
@@ -124,14 +126,14 @@ export class ApiService {
 
   // ── Vendors (Catalog) ────────────────────────────────────
   getVendors() {
-    return this.http.get<{ data: unknown[] }>('/api/catalog/vendors');
+    return this.http.get<{ data: Array<{ id: string; name: string; logoDataUrl?: string | null; createdAt: string }> }>('/api/catalog/vendors');
   }
 
-  createVendor(payload: { name: string }) {
+  createVendor(payload: { name: string; logoDataUrl?: string | null }) {
     return this.http.post<{ data: unknown }>('/api/catalog/vendors', payload);
   }
 
-  updateVendor(id: string, payload: { name: string }) {
+  updateVendor(id: string, payload: { name: string; logoDataUrl?: string | null }) {
     return this.http.patch<{ data: unknown }>(`/api/catalog/vendors/${id}`, payload);
   }
 
@@ -140,6 +142,42 @@ export class ApiService {
   }
 
   // ── Device Types (Catalog) ───────────────────────────────
+  getSites() {
+    return this.http.get<{ data: SiteDto[] }>('/api/catalog/sites');
+  }
+
+  createSite(payload: {
+    name: string;
+    street: string;
+    descriptiveNumber: string;
+    orientationNumber?: string | null;
+    zipNumber: string;
+    city: string;
+    latitude: number;
+    longitude: number;
+    description?: string | null;
+  }) {
+    return this.http.post<{ data: SiteDto }>('/api/catalog/sites', payload);
+  }
+
+  updateSite(id: string, payload: {
+    name: string;
+    street: string;
+    descriptiveNumber: string;
+    orientationNumber?: string | null;
+    zipNumber: string;
+    city: string;
+    latitude: number;
+    longitude: number;
+    description?: string | null;
+  }) {
+    return this.http.patch<{ data: SiteDto }>(`/api/catalog/sites/${id}`, payload);
+  }
+
+  deleteSite(id: string) {
+    return this.http.delete<{ ok: boolean }>(`/api/catalog/sites/${id}`);
+  }
+
   getDeviceTypes() {
     return this.http.get<{ data: Array<{ id: string; name: string; vendor?: string | null; photoDataUrl?: string | null; createdAt: string }> }>('/api/catalog/device-types');
   }

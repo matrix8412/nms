@@ -8,8 +8,16 @@ import { SearchableSelectComponent, type SearchableSelectOption } from '../../co
 import { SlidePanelComponent } from '../../core/layout/slide-panel.component';
 import { HostGroupsComponent } from '../hosts/host-groups.component';
 import { SnmpTemplatesComponent } from './snmp-templates.component';
+import { SitesComponent } from './sites.component';
 
-interface CatalogItem { id: string; name: string; createdAt: string; vendor?: string | null; photoDataUrl?: string | null; }
+interface CatalogItem {
+  id: string;
+  name: string;
+  createdAt: string;
+  vendor?: string | null;
+  photoDataUrl?: string | null;
+  logoDataUrl?: string | null;
+}
 
 type SortField = 'name' | 'createdAt';
 type SortDir = 'asc' | 'desc';
@@ -17,7 +25,7 @@ type SortDir = 'asc' | 'desc';
 @Component({
   selector: 'app-catalogs',
   standalone: true,
-  imports: [CommonModule, FormsModule, SlidePanelComponent, HostGroupsComponent, SnmpTemplatesComponent, ColumnFilterTriggerComponent, SearchableSelectComponent],
+  imports: [CommonModule, FormsModule, SlidePanelComponent, HostGroupsComponent, SnmpTemplatesComponent, SitesComponent, ColumnFilterTriggerComponent, SearchableSelectComponent],
   template: `
     <div class="page-header">
       <div>
@@ -34,6 +42,9 @@ type SortDir = 'asc' | 'desc';
       <button class="tab" [class.active]="activeTab() === 'device-types'" (click)="selectTab('device-types')">
         <span class="material-icons">devices_other</span> Device Types
       </button>
+      <button class="tab" [class.active]="activeTab() === 'sites'" (click)="selectTab('sites')">
+        <span class="material-icons">location_city</span> Sites
+      </button>
       <button class="tab" [class.active]="activeTab() === 'host-groups'" (click)="selectTab('host-groups')">
         <span class="material-icons">folder</span> Host Groups
       </button>
@@ -43,10 +54,11 @@ type SortDir = 'asc' | 'desc';
     </div>
 
     <!-- Content -->
+    <app-sites *ngIf="activeTab() === 'sites'" [embedded]="true" />
     <app-host-groups *ngIf="activeTab() === 'host-groups'" [embedded]="true" />
     <app-snmp-templates *ngIf="activeTab() === 'snmp-templates'" />
 
-    <div class="table-card" *ngIf="activeTab() !== 'host-groups' && activeTab() !== 'snmp-templates'">
+    <div class="table-card" *ngIf="activeTab() !== 'sites' && activeTab() !== 'host-groups' && activeTab() !== 'snmp-templates'">
       <div class="table-toolbar">
         <div style="flex:1"></div>
         <button class="btn btn-primary" (click)="openCreate()">
@@ -68,6 +80,7 @@ type SortDir = 'asc' | 'desc';
                 </app-column-filter-trigger>
               </div>
             </th>
+            <th *ngIf="activeTab() === 'vendors'">Logo</th>
             <th *ngIf="activeTab() === 'device-types'">Vendor</th>
             <th *ngIf="activeTab() === 'device-types'">Photo</th>
             <th class="sortable">
@@ -84,6 +97,12 @@ type SortDir = 'asc' | 'desc';
         <tbody>
           <tr *ngFor="let item of sortedItems()">
             <td class="cell-name">{{ item.name }}</td>
+            <td *ngIf="activeTab() === 'vendors'" class="cell-photo">
+              <div class="photo-thumb" *ngIf="item.logoDataUrl; else noVendorLogo">
+                <img [src]="item.logoDataUrl" [alt]="item.name + ' logo'" />
+              </div>
+              <ng-template #noVendorLogo>—</ng-template>
+            </td>
             <td *ngIf="activeTab() === 'device-types'">{{ item.vendor || 'Any vendor' }}</td>
             <td *ngIf="activeTab() === 'device-types'" class="cell-photo">
               <div class="photo-thumb" *ngIf="item.photoDataUrl; else noPhoto">
@@ -140,9 +159,17 @@ type SortDir = 'asc' | 'desc';
           Device Photo
           <input class="form-input" type="file" accept="image/png,image/jpeg,image/webp,image/gif" (change)="onDeviceTypePhotoSelected($event)" />
         </label>
+        <label class="form-label" *ngIf="activeTab() === 'vendors'">
+          Vendor Logo
+          <input class="form-input" type="file" accept="image/png,image/jpeg,image/webp,image/gif" (change)="onVendorLogoSelected($event)" />
+        </label>
         <div class="photo-preview" *ngIf="activeTab() === 'device-types' && formPhotoDataUrl">
           <img [src]="formPhotoDataUrl" [alt]="formName || 'Device type photo preview'" />
           <button type="button" class="btn btn-outline btn-small" (click)="clearDeviceTypePhoto()">Remove photo</button>
+        </div>
+        <div class="photo-preview" *ngIf="activeTab() === 'vendors' && formLogoDataUrl">
+          <img [src]="formLogoDataUrl" [alt]="formName || 'Vendor logo preview'" />
+          <button type="button" class="btn btn-outline btn-small" (click)="clearVendorLogo()">Remove logo</button>
         </div>
         <div class="panel-actions">
           <button type="button" class="btn btn-outline" (click)="panelOpen.set(false)">Cancel</button>
@@ -235,7 +262,7 @@ export class CatalogsComponent implements OnInit {
   private readonly router = inject(Router);
   private readonly route = inject(ActivatedRoute);
 
-  protected readonly activeTab = signal<'vendors' | 'device-types' | 'host-groups' | 'snmp-templates'>('vendors');
+  protected readonly activeTab = signal<'vendors' | 'device-types' | 'sites' | 'host-groups' | 'snmp-templates'>('vendors');
   protected readonly vendors = signal<CatalogItem[]>([]);
   protected readonly deviceTypes = signal<CatalogItem[]>([]);
   protected readonly vendorOptions = computed<SearchableSelectOption[]>(() =>
@@ -251,6 +278,7 @@ export class CatalogsComponent implements OnInit {
   protected formName = '';
   protected formVendor = '';
   protected formPhotoDataUrl: string | null = null;
+  protected formLogoDataUrl: string | null = null;
 
   protected readonly filteredItems = computed(() => {
     const q = this.searchQuery().toLowerCase();
@@ -290,7 +318,7 @@ export class CatalogsComponent implements OnInit {
     this.loadAll();
   }
 
-  protected selectTab(tab: 'vendors' | 'device-types' | 'host-groups' | 'snmp-templates') {
+  protected selectTab(tab: 'vendors' | 'device-types' | 'sites' | 'host-groups' | 'snmp-templates') {
     this.activeTab.set(tab);
     void this.router.navigate(['/settings/catalogs'], {
       queryParams: { tab },
@@ -298,9 +326,9 @@ export class CatalogsComponent implements OnInit {
     });
   }
 
-  private resolveInitialTab(): 'vendors' | 'device-types' | 'host-groups' | 'snmp-templates' {
+  private resolveInitialTab(): 'vendors' | 'device-types' | 'sites' | 'host-groups' | 'snmp-templates' {
     const tab = this.route.snapshot.queryParamMap.get('tab');
-    if (tab === 'vendors' || tab === 'device-types' || tab === 'host-groups' || tab === 'snmp-templates') {
+    if (tab === 'vendors' || tab === 'device-types' || tab === 'sites' || tab === 'host-groups' || tab === 'snmp-templates') {
       return tab;
     }
 
@@ -329,6 +357,7 @@ export class CatalogsComponent implements OnInit {
     this.formName = '';
     this.formVendor = '';
     this.formPhotoDataUrl = null;
+    this.formLogoDataUrl = null;
     this.panelOpen.set(true);
   }
 
@@ -337,6 +366,7 @@ export class CatalogsComponent implements OnInit {
     this.formName = item.name;
     this.formVendor = item.vendor ?? '';
     this.formPhotoDataUrl = item.photoDataUrl ?? null;
+    this.formLogoDataUrl = item.logoDataUrl ?? null;
     this.panelOpen.set(true);
   }
 
@@ -364,11 +394,35 @@ export class CatalogsComponent implements OnInit {
     this.formPhotoDataUrl = null;
   }
 
+  protected onVendorLogoSelected(event: Event) {
+    const input = event.target as HTMLInputElement | null;
+    const file = input?.files?.[0];
+    if (!file || !file.type.startsWith('image/')) {
+      if (input) {
+        input.value = '';
+      }
+      return;
+    }
+
+    const reader = new FileReader();
+    reader.onload = () => {
+      this.formLogoDataUrl = typeof reader.result === 'string' ? reader.result : null;
+      if (input) {
+        input.value = '';
+      }
+    };
+    reader.readAsDataURL(file);
+  }
+
+  protected clearVendorLogo() {
+    this.formLogoDataUrl = null;
+  }
+
   protected save() {
     const edit = this.editingItem();
     const isVendor = this.activeTab() === 'vendors';
     const payload = isVendor
-      ? { name: this.formName }
+      ? { name: this.formName, logoDataUrl: this.formLogoDataUrl }
       : { name: this.formName, vendor: this.formVendor || null, photoDataUrl: this.formPhotoDataUrl };
 
     const req = edit

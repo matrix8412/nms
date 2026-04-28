@@ -32,16 +32,6 @@ interface NavItem {
         <span class="brand-text" *ngIf="!sidebarCollapsed()">NMS</span>
       </div>
 
-      <div class="sidebar-user" *ngIf="!sidebarCollapsed()">
-        <div class="user-avatar">
-          <span class="material-icons">account_circle</span>
-        </div>
-        <div class="user-info">
-          <span class="user-name">{{ userName() }}</span>
-          <span class="user-role">{{ userRole() }}</span>
-        </div>
-      </div>
-
       <nav class="sidebar-nav">
         <ng-container *ngFor="let item of visibleNav()">
           <!-- Simple nav item -->
@@ -88,10 +78,21 @@ interface NavItem {
       </nav>
 
       <div class="sidebar-footer" *ngIf="!sidebarCollapsed()">
-        <button class="nav-item logout-btn" (click)="logout()" type="button">
-          <span class="material-icons nav-icon">logout</span>
-          <span class="nav-label">Logout</span>
-        </button>
+        <div class="sidebar-account">
+          <div class="sidebar-account-meta">
+            <div class="user-avatar">
+              <span class="material-icons">account_circle</span>
+            </div>
+            <div class="user-info">
+              <span class="user-name">{{ userName() }}</span>
+              <span class="user-role">{{ userRole() }}</span>
+            </div>
+          </div>
+          <button class="nav-item logout-btn" (click)="logout()" type="button">
+            <span class="material-icons nav-icon">logout</span>
+            <span class="nav-label">Logout</span>
+          </button>
+        </div>
       </div>
     </aside>
 
@@ -187,13 +188,6 @@ interface NavItem {
         letter-spacing: 1px;
       }
 
-      .sidebar-user {
-        display: flex;
-        align-items: center;
-        gap: 12px;
-        padding: 16px;
-        border-bottom: 1px solid rgba(255, 255, 255, 0.08);
-      }
       .user-avatar .material-icons {
         font-size: 40px;
         color: #4fc3f7;
@@ -279,6 +273,20 @@ interface NavItem {
       .sidebar-footer {
         padding: 8px;
         border-top: 1px solid rgba(255, 255, 255, 0.08);
+      }
+      .sidebar-account {
+        display: flex;
+        flex-direction: column;
+        gap: 8px;
+        padding: 8px;
+        border-radius: 10px;
+        background: rgba(255, 255, 255, 0.04);
+      }
+      .sidebar-account-meta {
+        display: flex;
+        align-items: center;
+        gap: 12px;
+        padding: 4px 4px 0;
       }
       .logout-btn {
         color: #f87171;
