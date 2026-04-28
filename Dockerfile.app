@@ -27,8 +27,8 @@ FROM base AS runtime
 
 ENV NODE_ENV=production
 
-# Install iputils-ping for ICMP monitoring (worker needs the `ping` command)
-RUN apt-get update && apt-get install -y --no-install-recommends iputils-ping \
+# Install runtime OS deps for Prisma and ICMP monitoring.
+RUN apt-get update && apt-get install -y --no-install-recommends iputils-ping openssl \
     && rm -rf /var/lib/apt/lists/*
 
 # Copy workspace structure (package.json files, lockfile, configs)
