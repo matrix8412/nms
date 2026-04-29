@@ -166,7 +166,7 @@ const METRIC_KEY_OPTIONS: Array<{ value: string; label: string }> = [
         </label>
         <label class="form-label">
           Metric Key
-          <input class="form-input" list="snmp-metric-key-options" [(ngModel)]="form.metricKey" name="metricKey" required placeholder="hostname or cpuLoad.1m" />
+          <input class="form-input" list="snmp-metric-key-options" [(ngModel)]="form.metricKey" name="metricKey" placeholder="hostname or cpuLoad.1m" />
           <datalist id="snmp-metric-key-options">
             <option *ngFor="let option of metricKeyOptions()" [value]="option.value">{{ option.label }}</option>
           </datalist>
@@ -174,11 +174,11 @@ const METRIC_KEY_OPTIONS: Array<{ value: string; label: string }> = [
         </label>
         <label class="form-label">
           OID
-          <input class="form-input" [(ngModel)]="form.oid" name="oid" required placeholder="1.3.6.1..." />
+          <input class="form-input" [(ngModel)]="form.oid" name="oid" placeholder="1.3.6.1..." />
         </label>
         <label class="form-label">
           Poll Interval (seconds)
-          <input class="form-input" type="number" min="30" max="86400" step="30" [(ngModel)]="form.intervalSec" name="intervalSec" required />
+          <input class="form-input" type="number" min="30" max="86400" step="30" [(ngModel)]="form.intervalSec" name="intervalSec" />
         </label>
         <label class="form-label toggle-row">
           <span>Enabled</span>
@@ -186,7 +186,7 @@ const METRIC_KEY_OPTIONS: Array<{ value: string; label: string }> = [
         </label>
         <div class="panel-actions">
           <button type="button" class="btn btn-outline" (click)="panelOpen.set(false)">Cancel</button>
-          <button type="submit" class="btn btn-primary">{{ editingItem() ? 'Update' : 'Create' }}</button>
+          <button type="button" class="btn btn-primary" (click)="save()">{{ editingItem() ? 'Update' : 'Create' }}</button>
         </div>
       </form>
     </app-slide-panel>
@@ -234,13 +234,13 @@ const METRIC_KEY_OPTIONS: Array<{ value: string; label: string }> = [
     .status-badge.enabled { background: #dcfce7; color: #16a34a; }
     .empty { display: flex; flex-direction: column; align-items: center; padding: 48px 20px; color: #94a3b8; }
     .empty .material-icons { font-size: 48px; margin-bottom: 12px; }
-    .panel-form { display: flex; flex-direction: column; gap: 16px; padding: 20px; }
+    .panel-form { display: flex; flex-direction: column; gap: 16px; padding: 20px; position: relative; z-index: 1; }
     .form-label { display: flex; flex-direction: column; gap: 6px; font-size: 0.84rem; font-weight: 600; color: #334155; }
     .form-input { padding: 8px 12px; border: 1px solid #e2e8f0; border-radius: 8px; font-size: 0.88rem; font-family: inherit; }
     .form-help { color: #64748b; font-size: 0.76rem; font-weight: 500; }
     .toggle-row { flex-direction: row; align-items: center; justify-content: space-between; }
     .toggle { width: 20px; height: 20px; accent-color: #3b82f6; }
-    .panel-actions { display: flex; gap: 10px; justify-content: flex-end; margin-top: 8px; }
+    .panel-actions { display: flex; gap: 10px; justify-content: flex-end; margin-top: 8px; position: relative; z-index: 10; }
     .modal-overlay { position: fixed; inset: 0; background: rgba(0,0,0,.35); display: flex; align-items: center; justify-content: center; z-index: 200; }
     .modal-card { background: #fff; border-radius: 14px; padding: 24px; max-width: 420px; width: 90%; box-shadow: 0 12px 48px rgba(0,0,0,.18); }
     .modal-card h3 { margin: 0 0 8px; font-size: 1.1rem; }
@@ -351,27 +351,23 @@ export class SnmpTemplatesComponent {
 
   protected openCreate() {
     this.editingItem.set(null);
-    this.form = {
-      vendor: '',
-      deviceType: '',
-      metricKey: 'hostname',
-      oid: '',
-      intervalSec: 1800,
-      enabled: true,
-    };
+    this.form.vendor = '';
+    this.form.deviceType = '';
+    this.form.metricKey = 'hostname';
+    this.form.oid = '';
+    this.form.intervalSec = 1800;
+    this.form.enabled = true;
     this.panelOpen.set(true);
   }
 
   protected openEdit(item: SnmpTemplateItem) {
     this.editingItem.set(item);
-    this.form = {
-      vendor: item.vendor ?? '',
-      deviceType: item.deviceType ?? '',
-      metricKey: item.metricKey,
-      oid: item.oid,
-      intervalSec: item.intervalSec,
-      enabled: item.enabled,
-    };
+    this.form.vendor = item.vendor ?? '';
+    this.form.deviceType = item.deviceType ?? '';
+    this.form.metricKey = item.metricKey;
+    this.form.oid = item.oid;
+    this.form.intervalSec = item.intervalSec;
+    this.form.enabled = item.enabled;
     this.panelOpen.set(true);
   }
 
@@ -390,9 +386,14 @@ export class SnmpTemplatesComponent {
       ? this.api.updateSnmpTemplate(editing.id, payload)
       : this.api.createSnmpTemplate(payload);
 
-    request.subscribe(() => {
-      this.panelOpen.set(false);
-      this.loadItems();
+    request.subscribe({
+      next: () => {
+        this.panelOpen.set(false);
+        this.loadItems();
+      },
+      error: (error: unknown) => {
+        console.error('Failed to save SNMP template:', error);
+      },
     });
   }
 

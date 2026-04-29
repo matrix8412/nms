@@ -84,6 +84,7 @@ import { Component, EventEmitter, Input, Output } from '@angular/core';
         flex: 1;
         overflow-y: auto;
         padding: 24px;
+        padding-bottom: 40px;
       }
     `,
   ],
