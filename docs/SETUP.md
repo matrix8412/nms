@@ -28,7 +28,7 @@ Required values:
 ## 3. Start Local Infrastructure
 
 ```bash
-docker compose up -d
+docker compose up --build -d
 docker compose ps
 ```
 

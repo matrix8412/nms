@@ -2,16 +2,17 @@ services:
   postgres:
     image: timescale/timescaledb:latest-pg16
     container_name: nms-postgres
+    restart: unless-stopped
     environment:
-      POSTGRES_DB: nms
-      POSTGRES_USER: nms
-      POSTGRES_PASSWORD: nms
+      POSTGRES_DB: ${POSTGRES_DB:-nms}
+      POSTGRES_USER: ${POSTGRES_USER:-nms}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-nms}
     ports:
-      - "5432:5432"
+      - "${POSTGRES_PORT:-5432}:5432"
     volumes:
       - postgres_data:/var/lib/postgresql/data
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U nms -d nms"]
+      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER:-nms} -d $${POSTGRES_DB:-nms}"]
       interval: 10s
       timeout: 5s
       retries: 10
@@ -19,8 +20,9 @@ services:
   redis:
     image: redis:8-alpine
     container_name: nms-redis
+    restart: unless-stopped
     ports:
-      - "6379:6379"
+      - "${REDIS_PORT:-6379}:6379"
     healthcheck:
       test: ["CMD", "redis-cli", "ping"]
       interval: 10s
@@ -30,9 +32,10 @@ services:
   mailhog:
     image: axllent/mailpit:latest
     container_name: nms-mailhog
+    restart: unless-stopped
     ports:
-      - "1025:1025"
-      - "8025:8025"
+      - "${SMTP_PORT_PUBLIC:-1025}:1025"
+      - "${MAILHOG_UI_PORT:-8025}:8025"
     healthcheck:
       test: ["CMD", "wget", "--spider", "-q", "http://localhost:8025"]
       interval: 20s
