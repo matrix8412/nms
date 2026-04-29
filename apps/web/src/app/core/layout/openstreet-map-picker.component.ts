@@ -15,6 +15,7 @@ import {
 type LeafletModule = typeof import('leaflet');
 type LeafletMap = import('leaflet').Map;
 type LeafletCircleMarker = import('leaflet').CircleMarker;
+type LeafletImport = LeafletModule & { default?: LeafletModule };
 
 @Component({
   selector: 'app-openstreet-map-picker',
@@ -76,13 +77,16 @@ export class OpenstreetMapPickerComponent implements AfterViewInit, OnChanges, O
   private map: LeafletMap | null = null;
   private marker: LeafletCircleMarker | null = null;
   private invalidateTimers: ReturnType<typeof setTimeout>[] = [];
+  private resizeObserver: ResizeObserver | null = null;
+  private intersectionObserver: IntersectionObserver | null = null;
 
   async ngAfterViewInit() {
     if (!this.mapHost) {
       return;
     }
 
-    this.leaflet = await import('leaflet');
+    const leafletModule = await import('leaflet') as LeafletImport;
+    this.leaflet = leafletModule.default ?? leafletModule;
     const L = this.leaflet;
     const initialLat = this.latitude ?? 48.1485965;
     const initialLng = this.longitude ?? 17.1077477;
@@ -107,6 +111,9 @@ export class OpenstreetMapPickerComponent implements AfterViewInit, OnChanges, O
 
     this.setMarker(this.latitude, this.longitude, false);
     this.scheduleInvalidate();
+    this.observeMapSize();
+    this.invalidateMapSize();
+    setTimeout(() => this.invalidateMapSize(), 350);
   }
 
   ngOnChanges(changes: SimpleChanges) {
@@ -125,9 +132,43 @@ export class OpenstreetMapPickerComponent implements AfterViewInit, OnChanges, O
       clearTimeout(timer);
     }
     this.invalidateTimers = [];
+    this.resizeObserver?.disconnect();
+    this.intersectionObserver?.disconnect();
     this.map?.remove();
+    this.resizeObserver = null;
+    this.intersectionObserver = null;
     this.map = null;
     this.marker = null;
+  }
+
+  private observeMapSize() {
+    const host = this.mapHost?.nativeElement;
+    if (!host) {
+      return;
+    }
+
+    if (typeof ResizeObserver !== 'undefined') {
+      this.resizeObserver = new ResizeObserver(() => this.invalidateMapSize());
+      this.resizeObserver.observe(host);
+    }
+
+    if (typeof IntersectionObserver !== 'undefined') {
+      this.intersectionObserver = new IntersectionObserver((entries) => {
+        if (entries.some((entry) => entry.isIntersecting)) {
+          this.invalidateMapSize();
+        }
+      });
+      this.intersectionObserver.observe(host);
+    }
+  }
+
+  private invalidateMapSize() {
+    if (typeof requestAnimationFrame === 'function') {
+      requestAnimationFrame(() => this.map?.invalidateSize());
+      return;
+    }
+
+    setTimeout(() => this.map?.invalidateSize(), 0);
   }
 
   private setMarker(latitude: number | null, longitude: number | null, emit: boolean) {

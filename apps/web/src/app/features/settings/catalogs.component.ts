@@ -132,6 +132,7 @@ type SortDir = 'asc' | 'desc';
 
     <!-- Create/Edit panel -->
     <app-slide-panel
+      *ngIf="showCatalogCrud()"
       [isOpen]="panelOpen()"
       [title]="editingItem() ? 'Edit' : 'New ' + (activeTab() === 'vendors' ? 'Vendor' : 'Device Type')"
       (close)="panelOpen.set(false)"
@@ -179,7 +180,7 @@ type SortDir = 'asc' | 'desc';
     </app-slide-panel>
 
     <!-- Delete confirmation -->
-    <div class="modal-overlay" *ngIf="deleteTarget()" (click)="deleteTarget.set(null)">
+    <div class="modal-overlay" *ngIf="showCatalogCrud() && deleteTarget()" (click)="deleteTarget.set(null)">
       <div class="modal-card" (click)="$event.stopPropagation()">
         <h3>Delete {{ activeTab() === 'vendors' ? 'Vendor' : 'Device Type' }}</h3>
         <p>Are you sure you want to delete <strong>{{ deleteTarget()?.name }}</strong>?</p>
@@ -268,6 +269,7 @@ export class CatalogsComponent implements OnInit {
   protected readonly vendorOptions = computed<SearchableSelectOption[]>(() =>
     this.vendors().map((item) => ({ value: item.name, label: item.name })),
   );
+  protected readonly showCatalogCrud = computed(() => this.activeTab() === 'vendors' || this.activeTab() === 'device-types');
   protected readonly searchQuery = signal('');
   protected readonly sortField = signal<SortField | ''>('');
   protected readonly sortDir = signal<SortDir>('asc');
@@ -319,6 +321,9 @@ export class CatalogsComponent implements OnInit {
   }
 
   protected selectTab(tab: 'vendors' | 'device-types' | 'sites' | 'host-groups' | 'snmp-templates') {
+    this.panelOpen.set(false);
+    this.editingItem.set(null);
+    this.deleteTarget.set(null);
     this.activeTab.set(tab);
     void this.router.navigate(['/settings/catalogs'], {
       queryParams: { tab },
