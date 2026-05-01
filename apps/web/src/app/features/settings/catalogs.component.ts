@@ -61,6 +61,13 @@ type SortDir = 'asc' | 'desc';
     <div class="table-card" *ngIf="activeTab() !== 'sites' && activeTab() !== 'host-groups' && activeTab() !== 'snmp-templates'">
       <div class="table-toolbar">
         <div style="flex:1"></div>
+        <input #catalogCsvInput type="file" accept=".csv,text/csv" hidden (change)="onCatalogCsvImport($event)" />
+        <button class="btn btn-outline" (click)="triggerCatalogCsvImport(catalogCsvInput)">
+          <span class="material-icons">upload_file</span> Import CSV
+        </button>
+        <button class="btn btn-outline" (click)="exportCatalogCsv()">
+          <span class="material-icons">download</span> Export CSV
+        </button>
         <button class="btn btn-primary" (click)="openCreate()">
           <span class="material-icons">add</span> Add {{ activeTab() === 'vendors' ? 'Vendor' : 'Device Type' }}
         </button>
@@ -98,7 +105,7 @@ type SortDir = 'asc' | 'desc';
           <tr *ngFor="let item of sortedItems()">
             <td class="cell-name">{{ item.name }}</td>
             <td *ngIf="activeTab() === 'vendors'" class="cell-photo">
-              <div class="photo-thumb" *ngIf="item.logoDataUrl; else noVendorLogo">
+              <div class="photo-thumb vendor-logo-thumb" *ngIf="item.logoDataUrl; else noVendorLogo">
                 <img [src]="item.logoDataUrl" [alt]="item.name + ' logo'" />
               </div>
               <ng-template #noVendorLogo>—</ng-template>
@@ -231,6 +238,7 @@ type SortDir = 'asc' | 'desc';
     .cell-date { color: #64748b; font-size: 0.84rem; }
     .cell-photo { width: 92px; }
     .photo-thumb { width: 52px; height: 52px; border-radius: 10px; overflow: hidden; border: 1px solid #e2e8f0; background: #f8fafc; display: inline-flex; align-items: center; justify-content: center; }
+    .vendor-logo-thumb { width: 26px; height: 26px; border-radius: 6px; }
     .photo-thumb img { width: 100%; height: 100%; object-fit: cover; display: block; }
     .col-actions { width: 100px; text-align: right; }
 
@@ -453,5 +461,40 @@ export class CatalogsComponent implements OnInit {
       this.deleteTarget.set(null);
       this.loadActive();
     });
+  }
+
+  protected triggerCatalogCsvImport(input: HTMLInputElement) {
+    input.value = '';
+    input.click();
+  }
+
+  protected onCatalogCsvImport(event: Event) {
+    const input = event.target as HTMLInputElement | null;
+    const file = input?.files?.[0];
+    if (!file) return;
+    file.text().then((csv) => {
+      const request = this.activeTab() === 'vendors'
+        ? this.api.importVendorsCsv(csv)
+        : this.api.importDeviceTypesCsv(csv);
+      request.subscribe(() => this.loadActive());
+    });
+  }
+
+  protected exportCatalogCsv() {
+    const request = this.activeTab() === 'vendors'
+      ? this.api.exportVendorsCsv()
+      : this.api.exportDeviceTypesCsv();
+    const fileName = this.activeTab() === 'vendors' ? 'vendors.csv' : 'device-types.csv';
+    request.subscribe((csv) => this.downloadCsv(fileName, csv));
+  }
+
+  private downloadCsv(fileName: string, csv: string) {
+    const blob = new Blob([csv], { type: 'text/csv;charset=utf-8' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = fileName;
+    link.click();
+    URL.revokeObjectURL(url);
   }
 }

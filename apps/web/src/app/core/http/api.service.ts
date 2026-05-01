@@ -84,6 +84,12 @@ export class ApiService {
   getDeviceGroups() {
     return this.http.get<{ data: unknown[] }>('/api/device-groups');
   }
+  exportDeviceGroupsCsv() {
+    return this.http.get('/api/device-groups/csv', { responseType: 'text' });
+  }
+  importDeviceGroupsCsv(csv: string) {
+    return this.http.post<{ ok: boolean }>('/api/device-groups/csv', { csv });
+  }
 
   createDeviceGroup(payload: { name: string; description?: string | null }) {
     return this.http.post<{ data: unknown }>('/api/device-groups', payload);
@@ -128,6 +134,12 @@ export class ApiService {
   getVendors() {
     return this.http.get<{ data: Array<{ id: string; name: string; logoDataUrl?: string | null; createdAt: string }> }>('/api/catalog/vendors');
   }
+  exportVendorsCsv() {
+    return this.http.get('/api/catalog/vendors/csv', { responseType: 'text' });
+  }
+  importVendorsCsv(csv: string) {
+    return this.http.post<{ ok: boolean }>('/api/catalog/vendors/csv', { csv });
+  }
 
   createVendor(payload: { name: string; logoDataUrl?: string | null }) {
     return this.http.post<{ data: unknown }>('/api/catalog/vendors', payload);
@@ -144,6 +156,12 @@ export class ApiService {
   // ── Device Types (Catalog) ───────────────────────────────
   getSites() {
     return this.http.get<{ data: SiteDto[] }>('/api/catalog/sites');
+  }
+  exportSitesCsv() {
+    return this.http.get('/api/catalog/sites/csv', { responseType: 'text' });
+  }
+  importSitesCsv(csv: string) {
+    return this.http.post<{ ok: boolean }>('/api/catalog/sites/csv', { csv });
   }
 
   createSite(payload: {
@@ -181,6 +199,12 @@ export class ApiService {
   getDeviceTypes() {
     return this.http.get<{ data: Array<{ id: string; name: string; vendor?: string | null; photoDataUrl?: string | null; createdAt: string }> }>('/api/catalog/device-types');
   }
+  exportDeviceTypesCsv() {
+    return this.http.get('/api/catalog/device-types/csv', { responseType: 'text' });
+  }
+  importDeviceTypesCsv(csv: string) {
+    return this.http.post<{ ok: boolean }>('/api/catalog/device-types/csv', { csv });
+  }
 
   createDeviceType(payload: { name: string; vendor?: string | null; photoDataUrl?: string | null }) {
     return this.http.post<{ data: unknown }>('/api/catalog/device-types', payload);
@@ -196,6 +220,12 @@ export class ApiService {
 
   getSnmpTemplates() {
     return this.http.get<{ data: unknown[] }>('/api/catalog/snmp-templates');
+  }
+  exportSnmpTemplatesCsv() {
+    return this.http.get('/api/catalog/snmp-templates/csv', { responseType: 'text' });
+  }
+  importSnmpTemplatesCsv(csv: string) {
+    return this.http.post<{ ok: boolean }>('/api/catalog/snmp-templates/csv', { csv });
   }
 
   createSnmpTemplate(payload: {

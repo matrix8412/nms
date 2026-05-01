@@ -26,14 +26,30 @@ type SortDir = 'asc' | 'desc';
         <h1>Host Groups</h1>
         <p class="subtitle">Organize hosts into logical groups</p>
       </div>
-      <button class="btn btn-primary" (click)="openCreate()">
-        <span class="material-icons">add</span> New Group
-      </button>
+      <div class="page-actions">
+        <button class="btn btn-outline" (click)="triggerCsvImport(csvInput)">
+          <span class="material-icons">upload_file</span> Import CSV
+        </button>
+        <button class="btn btn-outline" (click)="exportCsv()">
+          <span class="material-icons">download</span> Export CSV
+        </button>
+        <button class="btn btn-primary" (click)="openCreate()">
+          <span class="material-icons">add</span> New Group
+        </button>
+      </div>
     </div>
+
+    <input #csvInput type="file" accept=".csv,text/csv" hidden (change)="onCsvImport($event)" />
 
     <div class="table-card">
       <div class="table-toolbar" *ngIf="embedded()">
         <div style="flex: 1"></div>
+        <button class="btn btn-outline" (click)="triggerCsvImport(csvInput)">
+          <span class="material-icons">upload_file</span> Import CSV
+        </button>
+        <button class="btn btn-outline" (click)="exportCsv()">
+          <span class="material-icons">download</span> Export CSV
+        </button>
         <button class="btn btn-primary" (click)="openCreate()">
           <span class="material-icons">add</span> New Group
         </button>
@@ -134,6 +150,7 @@ type SortDir = 'asc' | 'desc';
   `,
   styles: [`
     .page-header { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 24px; flex-wrap: wrap; gap: 12px; }
+    .page-actions { display: inline-flex; gap: 8px; align-items: center; }
     .page-header h1 { margin: 0 0 4px; font-size: 1.5rem; font-weight: 700; color: #1a2332; }
     .subtitle { margin: 0; color: #64748b; font-size: 0.9rem; }
     .btn { display: inline-flex; align-items: center; gap: 6px; padding: 8px 18px; border: none; border-radius: 8px; font-weight: 600; font-size: 0.88rem; cursor: pointer; transition: background .15s; }
@@ -287,6 +304,32 @@ export class HostGroupsComponent implements OnInit {
     this.api.deleteDeviceGroup(t.id).subscribe(() => {
       this.deleteTarget.set(null);
       this.load();
+    });
+  }
+
+  protected triggerCsvImport(input: HTMLInputElement) {
+    input.value = '';
+    input.click();
+  }
+
+  protected onCsvImport(event: Event) {
+    const input = event.target as HTMLInputElement | null;
+    const file = input?.files?.[0];
+    if (!file) return;
+    file.text().then((csv) => {
+      this.api.importDeviceGroupsCsv(csv).subscribe(() => this.load());
+    });
+  }
+
+  protected exportCsv() {
+    this.api.exportDeviceGroupsCsv().subscribe((csv) => {
+      const blob = new Blob([csv], { type: 'text/csv;charset=utf-8' });
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = 'host-groups.csv';
+      link.click();
+      URL.revokeObjectURL(url);
     });
   }
 }

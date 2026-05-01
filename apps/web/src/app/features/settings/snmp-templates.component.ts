@@ -49,6 +49,13 @@ const METRIC_KEY_OPTIONS: Array<{ value: string; label: string }> = [
           <div class="toolbar-subtitle">Templates are applied automatically from the host vendor and device type.</div>
           <div class="toolbar-subtitle">Priority: exact vendor + type, then vendor-only, then type-only, then default.</div>
         </div>
+        <input #csvInput type="file" accept=".csv,text/csv" hidden (change)="onCsvImport($event)" />
+        <button class="btn btn-outline" (click)="triggerCsvImport(csvInput)">
+          <span class="material-icons">upload_file</span> Import CSV
+        </button>
+        <button class="btn btn-outline" (click)="exportCsv()">
+          <span class="material-icons">download</span> Export CSV
+        </button>
         <button class="btn btn-primary" (click)="openCreate()">
           <span class="material-icons">add</span> Add SNMP Template
         </button>
@@ -407,6 +414,32 @@ export class SnmpTemplatesComponent {
     this.api.deleteSnmpTemplate(target.id).subscribe(() => {
       this.deleteTarget.set(null);
       this.loadItems();
+    });
+  }
+
+  protected triggerCsvImport(input: HTMLInputElement) {
+    input.value = '';
+    input.click();
+  }
+
+  protected onCsvImport(event: Event) {
+    const input = event.target as HTMLInputElement | null;
+    const file = input?.files?.[0];
+    if (!file) return;
+    file.text().then((csv) => {
+      this.api.importSnmpTemplatesCsv(csv).subscribe(() => this.loadItems());
+    });
+  }
+
+  protected exportCsv() {
+    this.api.exportSnmpTemplatesCsv().subscribe((csv) => {
+      const blob = new Blob([csv], { type: 'text/csv;charset=utf-8' });
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = 'snmp-templates.csv';
+      link.click();
+      URL.revokeObjectURL(url);
     });
   }
 
