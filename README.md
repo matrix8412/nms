@@ -23,7 +23,7 @@ Production-oriented Network Management System for inventory, management, and mon
 
 ## Prerequisites
 
-- Node.js 22+
+- Node.js 24+
 - Docker + Docker Compose
 - Corepack enabled (`corepack enable`)
 

@@ -2,7 +2,7 @@
 
 ## 1. Prerequisites
 
-- Node.js 22+
+- Node.js 24+
 - Docker Desktop / Docker Engine with Compose plugin
 - Corepack enabled
 
