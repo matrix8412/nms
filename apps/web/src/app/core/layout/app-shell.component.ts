@@ -103,10 +103,6 @@ interface NavItem {
           <span class="material-icons">menu</span>
         </button>
         <div class="topbar-spacer"></div>
-        <div class="topbar-user">
-          <span class="material-icons">account_circle</span>
-          <span class="topbar-username">{{ userName() }}</span>
-        </div>
       </header>
 
       <main class="content">
@@ -330,19 +326,6 @@ interface NavItem {
       .topbar-spacer {
         flex: 1;
       }
-      .topbar-user {
-        display: flex;
-        align-items: center;
-        gap: 8px;
-        color: #475569;
-        font-size: 0.88rem;
-        font-weight: 500;
-      }
-      .topbar-user .material-icons {
-        font-size: 28px;
-        color: #94a3b8;
-      }
-
       .content {
         flex: 1;
         overflow-y: auto;
