@@ -35,7 +35,6 @@ type SortDir = 'asc' | 'desc';
         <table>
           <thead>
             <tr>
-              <th class="expand-col"></th>
               <th class="sortable status-col">
                 <div class="header-cell">
                   <button type="button" class="header-sort" (click)="toggleSort('icmpStatus')">
@@ -164,16 +163,6 @@ type SortDir = 'asc' | 'desc';
           <tbody>
             <ng-container *ngFor="let host of sortedHosts()">
               <tr class="row-hover">
-                <td class="expand-col">
-                  <button
-                    type="button"
-                    class="expand-btn expand-btn-inline"
-                    (click)="toggleExpanded(host.id)"
-                    [attr.aria-label]="(isExpanded(host.id) ? 'Hide' : 'Show') + ' device detail for ' + host.name"
-                    [attr.aria-expanded]="isExpanded(host.id)">
-                    {{ isExpanded(host.id) ? '−' : '+' }}
-                  </button>
-                </td>
                 <td class="status-col">
                   <span class="status-dot"
                         [class.status-up]="host.icmpStatus === 'UP'"
@@ -195,15 +184,6 @@ type SortDir = 'asc' | 'desc';
                       <div class="host-meta" *ngIf="host.snmpHostname || host.snmpSoftwareVersion">
                         {{ host.snmpHostname || host.snmpSoftwareVersion }}
                       </div>
-                      <button
-                        type="button"
-                        class="interfaces-toggle"
-                        (click)="toggleExpanded(host.id)"
-                        [attr.aria-expanded]="isExpanded(host.id)">
-                        <span class="material-icons">{{ isExpanded(host.id) ? 'visibility_off' : 'visibility' }}</span>
-                        {{ isExpanded(host.id) ? 'Hide interfaces' : 'Show interfaces' }}
-                        <span class="interfaces-count">{{ host.snmpInterfaces?.length || 0 }}</span>
-                      </button>
                     </div>
                   </div>
                 </td>
@@ -236,72 +216,12 @@ type SortDir = 'asc' | 'desc';
                   </button>
                 </td>
               </tr>
-              <tr *ngIf="isExpanded(host.id)" class="interface-row">
-                <td colspan="10" class="interface-cell">
-                  <div class="interface-panel">
-                    <div class="interface-panel-header">
-                      <div>
-                        <h3>Network interfaces</h3>
-                        <p>{{ host.snmpInterfaces?.length || 0 }} interface{{ (host.snmpInterfaces?.length || 0) === 1 ? '' : 's' }}</p>
-                      </div>
-                      <button
-                        type="button"
-                        class="panel-toggle-btn"
-                        (click)="toggleExpanded(host.id)"
-                        [attr.aria-expanded]="isExpanded(host.id)">
-                        <span class="material-icons">expand_less</span>
-                        Hide
-                      </button>
-                      </div>
-                    <div class="interface-summary">
-                      <span class="summary-pill" [class.summary-pill-up]="host.snmpStatus === 'UP'" [class.summary-pill-down]="host.snmpStatus === 'DOWN'">
-                          SNMP {{ host.snmpStatus }}
-                      </span>
-                      <span class="summary-pill" *ngIf="host.snmp?.version">{{ host.snmp?.version }} / {{ host.snmp?.port }}</span>
-                        <span class="summary-pill" *ngIf="host.snmpSoftwareVersion">{{ host.snmpSoftwareVersion }}</span>
-                      <span class="summary-pill" *ngIf="host.snmpUptimeTicks != null">Uptime {{ formatSnmpUptime(host.snmpUptimeTicks) }}</span>
-                      <span class="summary-pill" *ngIf="host.snmpHostname">{{ host.snmpHostname }}</span>
-                    </div>
-
-                    <div class="detail-empty" *ngIf="!host.snmpInterfaces?.length">
-                      Interface data is not available for this host yet.
-                    </div>
-
-                    <div class="table-wrap interface-table-wrap" *ngIf="host.snmpInterfaces?.length">
-                      <table>
-                        <thead>
-                          <tr>
-                            <th>#</th>
-                            <th>Name</th>
-                            <th>Description</th>
-                            <th>MAC</th>
-                            <th>Oper State</th>
-                          </tr>
-                        </thead>
-                        <tbody>
-                          <tr *ngFor="let item of host.snmpInterfaces || []">
-                            <td class="mono">{{ item.index }}</td>
-                            <td>{{ item.name }}</td>
-                            <td>{{ item.description || '—' }}</td>
-                            <td class="mono">{{ item.mac || '—' }}</td>
-                            <td>
-                              <span class="interface-state" [class.interface-state-up]="item.operStatus === 'up'" [class.interface-state-down]="item.operStatus === 'down'">
-                                {{ item.operStatus || 'unknown' }}
-                              </span>
-                            </td>
-                          </tr>
-                        </tbody>
-                      </table>
-                    </div>
-                  </div>
-                </td>
-              </tr>
             </ng-container>
             <tr *ngIf="sortedHosts().length === 0 && !loading()">
-              <td colspan="10" class="empty">No hosts matching your filters.</td>
+              <td colspan="9" class="empty">No hosts matching your filters.</td>
             </tr>
             <tr *ngIf="loading()">
-              <td colspan="10" class="empty">Loading...</td>
+              <td colspan="9" class="empty">Loading...</td>
             </tr>
           </tbody>
         </table>
@@ -924,3 +844,4 @@ export class HostListComponent implements OnInit, OnDestroy {
     });
   }
 }
+

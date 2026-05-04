@@ -159,28 +159,6 @@ import type { DeviceDto } from '@nms/shared';
           emptyText="No ICMP history collected yet."
         />
 
-        <div class="table-wrap" *ngIf="metrics().length > 0">
-          <table>
-            <thead>
-              <tr>
-                <th>Item Key</th>
-                <th>Value</th>
-                <th>Recorded</th>
-              </tr>
-            </thead>
-            <tbody>
-              <tr *ngFor="let m of metrics()">
-                <td class="mono">{{ m.itemKey }}</td>
-                <td>{{ m.valueNumeric ?? m.valueText ?? '—' }}</td>
-                <td class="mono">{{ m.recordedAt | date:'short' }}</td>
-              </tr>
-            </tbody>
-          </table>
-        </div>
-        <div class="empty-state" *ngIf="metrics().length === 0">
-          <span class="material-icons">info</span>
-          <p>No metrics collected yet.</p>
-        </div>
       </div>
     </div>
 
