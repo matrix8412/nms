@@ -28,6 +28,19 @@ export async function resolveItemKeysForDevice(
     return [...new Set(configured)];
   }
 
+  if (vendor) {
+    const vendorMappings = await prisma.zabbixItemMapping.findMany({
+      where: {
+        enabled: true,
+        vendor,
+      },
+      orderBy: [{ deviceType: 'desc' }, { itemKey: 'asc' }],
+    });
+    if (vendorMappings.length > 0) {
+      return [...new Set(vendorMappings.map((item) => item.itemKey))];
+    }
+  }
+
   const key = (deviceType ?? 'default').toLowerCase();
   return DEFAULT_KEYS_BY_TYPE[key] ?? DEFAULT_KEYS_BY_TYPE.default ?? [];
 }

@@ -267,6 +267,10 @@ export class ApiService {
     return this.http.put<{ data: unknown }>(`/api/integrations/${provider}`, payload);
   }
 
+  testIntegrationConnection(provider: string) {
+    return this.http.post<{ ok: boolean; provider: string; version?: string; tokenValidated?: boolean }>(`/api/integrations/${provider}/test`, {});
+  }
+
   // ── Roles ────────────────────────────────────────────────
   getRoles() {
     return this.http.get<{ data: unknown[] }>('/api/roles');
@@ -290,5 +294,18 @@ export class ApiService {
       deviceIds,
       force: true,
     });
+  }
+
+  getZabbixTemplates() {
+    return this.http.get<{ data: Array<{ id: string; host: string; name: string }> }>('/api/zabbix/templates');
+  }
+
+  mapZabbixTemplate(payload: {
+    templateId: string;
+    vendor?: string | null;
+    deviceType?: string | null;
+    replace?: boolean;
+  }) {
+    return this.http.post<{ ok: boolean; imported: number; totalItems: number }>('/api/zabbix/templates/map', payload);
   }
 }

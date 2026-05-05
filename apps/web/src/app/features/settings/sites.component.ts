@@ -1,6 +1,8 @@
 import { CommonModule } from '@angular/common';
 import { Component, computed, inject, input, signal, type OnInit } from '@angular/core';
+import { HttpErrorResponse } from '@angular/common/http';
 import { FormsModule } from '@angular/forms';
+import { finalize } from 'rxjs';
 import { ApiService } from '../../core/http/api.service';
 import { ColumnFilterTriggerComponent } from '../../core/layout/column-filter-trigger.component';
 import { OpenstreetMapPickerComponent } from '../../core/layout/openstreet-map-picker.component';
@@ -185,8 +187,11 @@ type SortDir = 'asc' | 'desc';
 
         <div class="panel-actions">
           <button type="button" class="btn btn-outline" (click)="panelOpen.set(false)">Cancel</button>
-          <button type="submit" class="btn btn-primary">{{ editing() ? 'Update' : 'Create' }}</button>
+          <button type="submit" class="btn btn-primary" [disabled]="submitting()">
+            {{ submitting() ? 'Saving...' : (editing() ? 'Update' : 'Create') }}
+          </button>
         </div>
+        <p class="form-error" *ngIf="submitError()">{{ submitError() }}</p>
       </form>
     </app-slide-panel>
 
@@ -256,6 +261,8 @@ type SortDir = 'asc' | 'desc';
       .map-section-header span { font-size: 0.88rem; font-weight: 700; color: #1e293b; }
       .map-section-header small { color: #64748b; font-size: 0.78rem; }
       .panel-actions { display: flex; gap: 10px; justify-content: flex-end; margin-top: 8px; }
+      .panel-actions .btn[disabled] { opacity: .7; cursor: not-allowed; }
+      .form-error { margin: 4px 0 0; color: #b91c1c; font-size: 0.84rem; font-weight: 600; }
       .modal-overlay { position: fixed; inset: 0; background: rgba(0,0,0,.35); display: flex; align-items: center; justify-content: center; z-index: 200; }
       .modal-card { background: #fff; border-radius: 14px; padding: 24px; max-width: 420px; width: 90%; box-shadow: 0 12px 48px rgba(0,0,0,.18); }
       .modal-card h3 { margin: 0 0 8px; font-size: 1.1rem; }
@@ -282,6 +289,8 @@ export class SitesComponent implements OnInit {
   protected readonly panelOpen = signal(false);
   protected readonly editing = signal<SiteDto | null>(null);
   protected readonly deleteTarget = signal<SiteDto | null>(null);
+  protected readonly submitting = signal(false);
+  protected readonly submitError = signal('');
 
   protected form = this.emptyForm();
 
@@ -331,12 +340,14 @@ export class SitesComponent implements OnInit {
 
   protected openCreate() {
     this.editing.set(null);
+    this.submitError.set('');
     this.form = this.emptyForm();
     this.panelOpen.set(true);
   }
 
   protected openEdit(site: SiteDto) {
     this.editing.set(site);
+    this.submitError.set('');
     this.form = {
       name: site.name,
       street: site.street,
@@ -352,6 +363,12 @@ export class SitesComponent implements OnInit {
   }
 
   protected save() {
+    if (this.submitting()) {
+      return;
+    }
+    this.submitting.set(true);
+    this.submitError.set('');
+
     const payload = {
       name: this.form.name.trim(),
       street: this.form.street.trim(),
@@ -369,9 +386,20 @@ export class SitesComponent implements OnInit {
       ? this.api.updateSite(editing.id, payload)
       : this.api.createSite(payload);
 
-    request.subscribe(() => {
-      this.panelOpen.set(false);
-      this.load();
+    request.pipe(finalize(() => this.submitting.set(false))).subscribe({
+      next: () => {
+        this.panelOpen.set(false);
+        this.load();
+      },
+      error: (error: HttpErrorResponse) => {
+        const payload = error.error as { message?: string; details?: { fieldErrors?: Record<string, string[]>; formErrors?: string[] } } | null;
+        const message = payload?.message?.trim() ?? '';
+        const detailFieldMessage = payload?.details?.fieldErrors
+          ? Object.values(payload.details.fieldErrors).flat().find((item) => !!item?.trim()) ?? ''
+          : '';
+        const detailFormMessage = payload?.details?.formErrors?.find((item) => !!item?.trim()) ?? '';
+        this.submitError.set(detailFieldMessage || detailFormMessage || message || 'Failed to save site. Check values and try again.');
+      },
     });
   }
 

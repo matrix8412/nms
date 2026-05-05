@@ -30,11 +30,20 @@ import type { DeviceDto } from '@nms/shared';
         <span class="material-icons">edit</span>
         Edit
       </button>
+      <button *ngIf="host()" class="btn btn-outline" [disabled]="syncingZabbix()" (click)="syncFromZabbix()">
+        <span class="material-icons">sync</span>
+        {{ syncingZabbix() ? 'Syncing...' : 'Sync from Zabbix' }}
+      </button>
     </div>
+    <div class="sync-message" *ngIf="syncMessage()">{{ syncMessage() }}</div>
 
     <div class="detail-tabs" *ngIf="host()">
       <button type="button" class="detail-tab" [class.active]="activeTab() === 'overview'" (click)="activeTab.set('overview')">
         Overview
+      </button>
+      <button type="button" class="detail-tab" [class.active]="activeTab() === 'zabbix'" (click)="activeTab.set('zabbix')">
+        Zabbix Metrics
+        <span class="detail-tab-count">{{ zabbixMetricRows().length }}</span>
       </button>
       <button type="button" class="detail-tab" [class.active]="activeTab() === 'interfaces'" (click)="activeTab.set('interfaces')">
         Interfaces
@@ -162,6 +171,54 @@ import type { DeviceDto } from '@nms/shared';
       </div>
     </div>
 
+    <div class="info-card interfaces-card" *ngIf="host() && activeTab() === 'zabbix'">
+      <div class="card-title">
+        <span class="material-icons">monitoring</span>
+        Zabbix Metrics
+      </div>
+      <div class="zabbix-controls" *ngIf="zabbixNumericKeys().length">
+        <label for="zabbixMetricKey">Metric chart</label>
+        <select id="zabbixMetricKey" [ngModel]="selectedZabbixMetricKey()" (ngModelChange)="selectedZabbixMetricKey.set($event)">
+          <option *ngFor="let itemKey of zabbixNumericKeys()" [value]="itemKey">{{ itemKey }}</option>
+        </select>
+      </div>
+      <app-time-series-chart
+        *ngIf="selectedZabbixMetricKey()"
+        [title]="selectedZabbixMetricKey()"
+        subtitle="Numeric values imported from Zabbix template items"
+        [points]="zabbixChartData()"
+        [series]="zabbixChartSeries"
+        [ranges]="zabbixChartRanges"
+        emptyText="No numeric samples for selected metric."
+      />
+      <div class="table-wrap" *ngIf="zabbixMetricRows().length; else emptyZabbixState">
+        <table>
+          <thead>
+            <tr>
+              <th>Time</th>
+              <th>Item Key</th>
+              <th>Item Name</th>
+              <th>Value</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr *ngFor="let item of zabbixMetricRows()">
+              <td>{{ item.recordedAt | date:'medium' }}</td>
+              <td class="mono">{{ item.itemKey }}</td>
+              <td>{{ item.itemName || '—' }}</td>
+              <td class="mono">{{ item.valueNumeric ?? item.valueText ?? '—' }}</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+      <ng-template #emptyZabbixState>
+        <div class="empty-state">
+          <span class="material-icons">monitoring</span>
+          <p>No Zabbix metrics imported yet.</p>
+        </div>
+      </ng-template>
+    </div>
+
     <div class="info-card interfaces-card" *ngIf="host() && activeTab() === 'interfaces'">
         <div class="card-title">
           <span class="material-icons">lan</span>
@@ -266,6 +323,15 @@ import type { DeviceDto } from '@nms/shared';
       .btn .material-icons { font-size: 18px; }
       .btn-primary { background: #3b82f6; color: #fff; }
       .btn-primary:hover { background: #2563eb; }
+      .btn-outline { background: #fff; color: #475569; border: 1px solid #dbe4ee; }
+      .btn-outline:hover:not(:disabled) { background: #f8fafc; }
+      .btn:disabled { opacity: 0.7; cursor: not-allowed; }
+      .sync-message {
+        margin: -10px 0 16px;
+        font-size: 0.84rem;
+        color: #1d4ed8;
+        font-weight: 600;
+      }
 
       .detail-grid {
         display: grid;
@@ -386,6 +452,23 @@ import type { DeviceDto } from '@nms/shared';
       }
 
       /* Metrics table */
+      .zabbix-controls {
+        display: flex;
+        gap: 8px;
+        align-items: center;
+        padding: 12px 20px 0;
+      }
+      .zabbix-controls label {
+        font-size: 0.82rem;
+        font-weight: 600;
+        color: #475569;
+      }
+      .zabbix-controls select {
+        padding: 6px 10px;
+        border: 1px solid #dbe4ee;
+        border-radius: 8px;
+        font-size: 0.84rem;
+      }
       .table-wrap { overflow-x: auto; }
       table { width: 100%; border-collapse: collapse; }
       th {
@@ -433,10 +516,13 @@ export class HostDetailComponent implements OnInit {
 
   protected readonly host = signal<DeviceDto | null>(null);
   protected readonly metrics = signal<Array<{
+    source?: string;
     itemKey: string;
+    itemName?: string | null;
     valueNumeric: number | null;
     valueText: string | null;
     recordedAt: string;
+    metadata?: { zabbixItemId?: string } | null;
   }>>([]);
   protected readonly icmpHistory = signal<Array<{
     recordedAt: string;
@@ -444,7 +530,53 @@ export class HostDetailComponent implements OnInit {
     rttMs: number | null;
     packetLossPercent: number | null;
   }>>([]);
-  protected readonly activeTab = signal<'overview' | 'interfaces'>('overview');
+  protected readonly activeTab = signal<'overview' | 'zabbix' | 'interfaces'>('overview');
+  protected readonly syncingZabbix = signal(false);
+  protected readonly syncMessage = signal('');
+  protected readonly selectedZabbixMetricKey = signal('');
+  protected readonly zabbixMetricRows = computed(() =>
+    this.metrics().filter((item) => item.source === 'zabbix'),
+  );
+  protected readonly zabbixNumericKeys = computed(() => {
+    const keys = new Set<string>();
+    for (const item of this.zabbixMetricRows()) {
+      if (item.valueNumeric != null) {
+        keys.add(item.itemKey);
+      }
+    }
+    return [...keys].sort((a, b) => a.localeCompare(b, 'sk', { sensitivity: 'base' }));
+  });
+  protected readonly zabbixChartData = computed<TimeSeriesChartPoint[]>(() => {
+    const selected = this.selectedZabbixMetricKey();
+    if (!selected) {
+      return [];
+    }
+    return this.zabbixMetricRows()
+      .filter((item) => item.itemKey === selected)
+      .slice()
+      .reverse()
+      .map((item) => ({
+        timestamp: item.recordedAt,
+        values: {
+          metric: item.valueNumeric,
+        },
+      }));
+  });
+  protected readonly zabbixChartSeries: TimeSeriesChartSeries[] = [
+    {
+      key: 'metric',
+      label: 'Value',
+      color: '#2563eb',
+      axis: 'left',
+      decimals: 2,
+    },
+  ];
+  protected readonly zabbixChartRanges: TimeSeriesChartRangeOption[] = [
+    { label: '1H', value: '1h', durationMs: 60 * 60 * 1000 },
+    { label: '6H', value: '6h', durationMs: 6 * 60 * 60 * 1000 },
+    { label: '24H', value: '24h', durationMs: 24 * 60 * 60 * 1000 },
+    { label: 'All', value: 'all' },
+  ];
   protected readonly editPanelOpen = signal(false);
   protected readonly error = signal('');
   protected readonly icmpChartData = computed<TimeSeriesChartPoint[]>(() => {
@@ -496,11 +628,21 @@ export class HostDetailComponent implements OnInit {
         this.host.set(res.data);
         this.activeTab.set('overview');
         this.metrics.set((res.data.metrics ?? []) as Array<{
+          source?: string;
           itemKey: string;
+          itemName?: string | null;
           valueNumeric: number | null;
           valueText: string | null;
           recordedAt: string;
+          metadata?: { zabbixItemId?: string } | null;
         }>);
+        const firstNumeric = ((res.data.metrics ?? []) as Array<{
+          source?: string;
+          itemKey: string;
+          valueNumeric: number | null;
+          metadata?: { zabbixItemId?: string } | null;
+        }>).find((item) => item.source === 'zabbix' && item.valueNumeric != null)?.itemKey ?? '';
+        this.selectedZabbixMetricKey.set(firstNumeric);
         this.icmpHistory.set((res.data.icmpHistory ?? []) as Array<{
           recordedAt: string;
           status: 'UP' | 'DOWN';
@@ -515,6 +657,26 @@ export class HostDetailComponent implements OnInit {
   protected onSaved() {
     this.editPanelOpen.set(false);
     this.loadHost();
+  }
+
+  protected syncFromZabbix() {
+    const current = this.host();
+    if (!current) {
+      return;
+    }
+    this.syncingZabbix.set(true);
+    this.syncMessage.set('');
+    this.api.triggerZabbixSync([current.id]).subscribe({
+      next: (res) => {
+        this.syncingZabbix.set(false);
+        this.syncMessage.set(`Zabbix sync started (${res.enqueued} queued).`);
+        this.loadHost();
+      },
+      error: (error) => {
+        this.syncingZabbix.set(false);
+        this.syncMessage.set(error?.error?.message || 'Failed to start Zabbix sync');
+      },
+    });
   }
 
   protected formatSnmpUptime(ticks: number) {

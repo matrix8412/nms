@@ -499,8 +499,9 @@ export async function getDeviceById(deviceId: string, session: NonNullable<Sessi
         },
       },
       metrics: {
+        where: { source: 'zabbix' },
         orderBy: { recordedAt: 'desc' },
-        take: 20,
+        take: 500,
       },
     },
   });
@@ -559,6 +560,7 @@ export async function getDeviceById(deviceId: string, session: NonNullable<Sessi
     .slice(-720);
 
   const metrics = device.metrics.map((metric) => ({
+    source: metric.source,
     itemKey: metric.itemKey,
     itemName: metric.itemName,
     valueNumeric: metric.valueNumeric,

@@ -34,19 +34,31 @@ export async function syncDeviceFromZabbix(deviceId: string): Promise<void> {
     return;
   }
 
-  await prisma.deviceMetric.createMany({
-    data: items.map((item) => ({
-      deviceId: device.id,
-      source: 'zabbix',
-      itemKey: item.key_,
-      itemName: item.name,
-      valueNumeric: parseNumeric(item.lastvalue),
-      valueText: item.lastvalue,
-      recordedAt: item.lastclock ? new Date(Number(item.lastclock) * 1000) : new Date(),
-      metadata: {
-        zabbixItemId: item.itemid,
-        units: item.units,
+  const metrics = items.map((item) => ({
+    deviceId: device.id,
+    source: 'zabbix',
+    itemKey: item.key_,
+    itemName: item.name,
+    valueNumeric: parseNumeric(item.lastvalue),
+    valueText: item.lastvalue,
+    recordedAt: item.lastclock ? new Date(Number(item.lastclock) * 1000) : new Date(),
+    metadata: {
+      zabbixItemId: item.itemid,
+      units: item.units,
+    },
+  }));
+  const metricItemKeys = [...new Set(metrics.map((metric) => metric.itemKey))];
+
+  await prisma.$transaction([
+    prisma.deviceMetric.deleteMany({
+      where: {
+        deviceId: device.id,
+        source: 'zabbix',
+        itemKey: { in: metricItemKeys },
       },
-    })),
-  });
+    }),
+    prisma.deviceMetric.createMany({
+      data: metrics,
+    }),
+  ]);
 }

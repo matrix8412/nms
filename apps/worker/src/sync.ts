@@ -72,6 +72,38 @@ function parseNumeric(value: string): number | null {
   return Number.isFinite(numeric) ? numeric : null;
 }
 
+function toApiUrl(raw: string): string {
+  const trimmed = raw.trim();
+  if (!trimmed) {
+    return '';
+  }
+  return trimmed.endsWith('/api_jsonrpc.php') ? trimmed : `${trimmed.replace(/\/+$/, '')}/api_jsonrpc.php`;
+}
+
+async function resolveZabbixConnection() {
+  const integration = await prisma.integrationConfig.findUnique({
+    where: { provider: 'zabbix' },
+    select: { enabled: true, settings: true },
+  });
+
+  const settings = integration?.settings && typeof integration.settings === 'object'
+    ? integration.settings as Record<string, unknown>
+    : null;
+
+  const url = toApiUrl(String(settings?.url ?? ''));
+  const token = String(settings?.apiToken ?? '').trim();
+
+  if (integration?.enabled && url && token) {
+    return { url, token, user: '', pass: '' };
+  }
+
+  if (env.ZABBIX_URL && env.ZABBIX_USER && env.ZABBIX_PASS) {
+    return { url: `${env.ZABBIX_URL}/api_jsonrpc.php`, token: '', user: env.ZABBIX_USER, pass: env.ZABBIX_PASS };
+  }
+
+  return null;
+}
+
 async function resolveItemKeys(vendor?: string | null, deviceType?: string | null) {
   const rows = await prisma.zabbixItemMapping.findMany({
     where: {
@@ -87,6 +119,20 @@ async function resolveItemKeys(vendor?: string | null, deviceType?: string | nul
 
   if (rows.length > 0) {
     return [...new Set(rows.map((item: { itemKey: string }) => item.itemKey))];
+  }
+
+  if (vendor) {
+    const vendorRows = await prisma.zabbixItemMapping.findMany({
+      where: {
+        enabled: true,
+        vendor,
+      },
+      orderBy: [{ deviceType: 'desc' }, { itemKey: 'asc' }],
+    });
+
+    if (vendorRows.length > 0) {
+      return [...new Set(vendorRows.map((item: { itemKey: string }) => item.itemKey))];
+    }
   }
 
   return (
@@ -116,27 +162,52 @@ export async function syncDevice(deviceId: string, force = false) {
   if (!device) return;
 
   const metrics: Prisma.DeviceMetricCreateManyInput[] = [];
+  const zabbixMetrics: Prisma.DeviceMetricCreateManyInput[] = [];
 
-  if (device.zabbixHostId && env.ZABBIX_URL && env.ZABBIX_USER && env.ZABBIX_PASS) {
-    const client = new ZabbixClient(`${env.ZABBIX_URL}/api_jsonrpc.php`, env.ZABBIX_USER, env.ZABBIX_PASS);
+  if (device.zabbixHostId) {
+    const zabbixConnection = await resolveZabbixConnection();
+    if (zabbixConnection) {
+      const client = new ZabbixClient(
+        zabbixConnection.url,
+        zabbixConnection.user,
+        zabbixConnection.pass,
+        zabbixConnection.token,
+      );
 
-    const itemKeys = await resolveItemKeys(device.vendor, device.type);
-    const items = await client.itemGet(device.zabbixHostId, itemKeys);
-    metrics.push(
-      ...items.map((item) => ({
-        deviceId: device.id,
-        source: 'zabbix',
-        itemKey: item.key_,
-        itemName: item.name,
-        valueNumeric: parseNumeric(item.lastvalue),
-        valueText: item.lastvalue,
-        recordedAt: item.lastclock ? new Date(Number(item.lastclock) * 1000) : new Date(),
-        metadata: {
-          zabbixItemId: item.itemid,
-          units: item.units,
+      const itemKeys = await resolveItemKeys(device.vendor, device.type);
+      const items = await client.itemGet(device.zabbixHostId, itemKeys);
+      zabbixMetrics.push(
+        ...items.map((item) => ({
+          deviceId: device.id,
+          source: 'zabbix',
+          itemKey: item.key_,
+          itemName: item.name,
+          valueNumeric: parseNumeric(item.lastvalue),
+          valueText: item.lastvalue,
+          recordedAt: item.lastclock ? new Date(Number(item.lastclock) * 1000) : new Date(),
+          metadata: {
+            zabbixItemId: item.itemid,
+            units: item.units,
+          },
+        })),
+      );
+    }
+  }
+
+  if (zabbixMetrics.length > 0) {
+    const zabbixItemKeys = [...new Set(zabbixMetrics.map((metric) => metric.itemKey))];
+    await prisma.$transaction([
+      prisma.deviceMetric.deleteMany({
+        where: {
+          deviceId: device.id,
+          source: 'zabbix',
+          itemKey: { in: zabbixItemKeys },
         },
-      })),
-    );
+      }),
+      prisma.deviceMetric.createMany({
+        data: zabbixMetrics,
+      }),
+    ]);
   }
 
   if (device.snmpVersion) {

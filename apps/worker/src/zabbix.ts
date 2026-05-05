@@ -4,19 +4,24 @@ export class ZabbixClient {
 
   constructor(
     private readonly baseUrl: string,
-    private readonly user: string,
-    private readonly password: string,
+    private readonly user?: string,
+    private readonly password?: string,
+    private readonly apiToken?: string,
   ) {}
 
   private async request<T>(method: string, params: unknown, auth?: string | null): Promise<T> {
+    const token = this.apiToken?.trim();
     const response = await fetch(this.baseUrl, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: {
+        'Content-Type': 'application/json',
+        ...(token ? { Authorization: `Bearer ${token}` } : {}),
+      },
       body: JSON.stringify({
         jsonrpc: '2.0',
         method,
         params,
-        auth,
+        ...(token ? {} : { auth }),
         id: this.idCounter++,
       }),
     });
@@ -35,7 +40,14 @@ export class ZabbixClient {
   }
 
   async login() {
+    if (this.apiToken?.trim()) {
+      this.authToken = this.apiToken.trim();
+      return this.authToken;
+    }
     if (this.authToken) return this.authToken;
+    if (!this.user || !this.password) {
+      throw new Error('Missing Zabbix credentials');
+    }
     this.authToken = await this.request<string>('user.login', {
       user: this.user,
       password: this.password,

@@ -20,68 +20,91 @@ interface SiteOption extends SearchableSelectOption {}
   imports: [CommonModule, FormsModule, SearchableSelectComponent],
   template: `
     <form (ngSubmit)="onSubmit()" class="form">
-      <div class="form-group">
-        <label for="name">Host Name *</label>
-        <input id="name" type="text" [(ngModel)]="form.name" name="name" required minlength="2" placeholder="e.g. Core Switch 01" />
+      <div class="form-tabs">
+        <button type="button" class="tab-btn" [class.active]="activeTab() === 'general'" (click)="activeTab.set('general')">General</button>
+        <button type="button" class="tab-btn" [class.active]="activeTab() === 'snmp'" (click)="activeTab.set('snmp')">SNMP</button>
       </div>
 
-      <div class="form-group">
-        <label for="ip">IP Address *</label>
-        <input id="ip" type="text" [(ngModel)]="form.ip" name="ip" required placeholder="e.g. 192.168.1.1" />
-      </div>
+      <ng-container *ngIf="activeTab() === 'general'">
+        <div class="form-group">
+          <label for="name">Host Name *</label>
+          <input id="name" type="text" [(ngModel)]="form.name" name="name" required minlength="2" placeholder="e.g. Core Switch 01" />
+        </div>
 
-      <div class="form-group">
-        <label>Vendor</label>
-        <app-searchable-select
-          [(ngModel)]="form.vendor"
-          (ngModelChange)="onVendorChange()"
-          [ngModelOptions]="{ standalone: true }"
-          [options]="vendors()"
-          [compact]="true"
-          placeholder="Select vendor"
-          metaText="Catalog search without diacritics"
-          searchPlaceholder="Search vendor"
-          emptyOptionLabel="No vendor"
-          emptyStateLabel="No matching vendors"
-        />
-      </div>
+        <div class="form-group">
+          <label for="ip">IP Address *</label>
+          <input id="ip" type="text" [(ngModel)]="form.ip" name="ip" required placeholder="e.g. 192.168.1.1" />
+        </div>
 
-      <div class="form-group">
-        <label>Device Type</label>
-        <app-searchable-select
-          [(ngModel)]="form.type"
-          [ngModelOptions]="{ standalone: true }"
-          [options]="deviceTypes()"
-          [compact]="true"
-          placeholder="Select device type"
-          metaText="Filter available types instantly"
-          searchPlaceholder="Search device type"
-          emptyOptionLabel="No device type"
-          emptyStateLabel="No matching device types"
-        />
-      </div>
+        <div class="form-group">
+          <label>Vendor</label>
+          <app-searchable-select
+            [(ngModel)]="form.vendor"
+            (ngModelChange)="onVendorChange()"
+            [ngModelOptions]="{ standalone: true }"
+            [options]="vendors()"
+            [compact]="true"
+            placeholder="Select vendor"
+            metaText="Catalog search without diacritics"
+            searchPlaceholder="Search vendor"
+            emptyOptionLabel="No vendor"
+            emptyStateLabel="No matching vendors"
+          />
+        </div>
 
-      <div class="form-group">
-        <label>Site</label>
-        <app-searchable-select
-          [(ngModel)]="form.siteId"
-          [ngModelOptions]="{ standalone: true }"
-          [options]="sites()"
-          [compact]="true"
-          placeholder="Select site"
-          metaText="Assign one physical site to the host"
-          searchPlaceholder="Search site"
-          emptyOptionLabel="No site"
-          emptyStateLabel="No matching sites"
-        />
-      </div>
+        <div class="form-group">
+          <label>Device Type</label>
+          <app-searchable-select
+            [(ngModel)]="form.type"
+            [ngModelOptions]="{ standalone: true }"
+            [options]="deviceTypes()"
+            [compact]="true"
+            placeholder="Select device type"
+            metaText="Filter available types instantly"
+            searchPlaceholder="Search device type"
+            emptyOptionLabel="No device type"
+            emptyStateLabel="No matching device types"
+          />
+        </div>
 
-      <div class="form-group">
-        <label for="zabbixHostId">Zabbix Host ID (optional)</label>
-        <input id="zabbixHostId" type="text" [(ngModel)]="form.zabbixHostId" name="zabbixHostId" placeholder="Leave empty for manual host" />
-      </div>
+        <div class="form-group">
+          <label>Site</label>
+          <app-searchable-select
+            [(ngModel)]="form.siteId"
+            [ngModelOptions]="{ standalone: true }"
+            [options]="sites()"
+            [compact]="true"
+            placeholder="Select site"
+            metaText="Assign one physical site to the host"
+            searchPlaceholder="Search site"
+            emptyOptionLabel="No site"
+            emptyStateLabel="No matching sites"
+          />
+        </div>
 
-      <div class="form-section">
+        <div class="form-group">
+          <label for="zabbixHostId">Zabbix Host ID (optional)</label>
+          <input id="zabbixHostId" type="text" [(ngModel)]="form.zabbixHostId" name="zabbixHostId" placeholder="Leave empty for manual host" />
+        </div>
+
+        <div class="form-group" *ngIf="deviceGroups().length > 0">
+          <label>Device Groups</label>
+          <app-searchable-select
+            [(ngModel)]="form.deviceGroupIds"
+            [ngModelOptions]="{ standalone: true }"
+            [options]="deviceGroups()"
+            [multiple]="true"
+            [compact]="true"
+            placeholder="Select device groups"
+            metaText="Multi-select with fulltext search"
+            searchPlaceholder="Search device groups"
+            emptyOptionLabel="No device groups"
+            emptyStateLabel="No matching device groups"
+          />
+        </div>
+      </ng-container>
+
+      <div class="form-section" *ngIf="activeTab() === 'snmp'">
         <div class="section-heading">
           <span>SNMP Monitoring</span>
           <small>Optional direct polling for host data and interfaces</small>
@@ -148,22 +171,6 @@ interface SiteOption extends SearchableSelectOption {}
         </div>
       </div>
 
-      <div class="form-group" *ngIf="deviceGroups().length > 0">
-        <label>Device Groups</label>
-        <app-searchable-select
-          [(ngModel)]="form.deviceGroupIds"
-          [ngModelOptions]="{ standalone: true }"
-          [options]="deviceGroups()"
-          [multiple]="true"
-          [compact]="true"
-          placeholder="Select device groups"
-          metaText="Multi-select with fulltext search"
-          searchPlaceholder="Search device groups"
-          emptyOptionLabel="No device groups"
-          emptyStateLabel="No matching device groups"
-        />
-      </div>
-
       <div class="form-error" *ngIf="error()">{{ error() }}</div>
 
       <div class="form-actions">
@@ -181,6 +188,29 @@ interface SiteOption extends SearchableSelectOption {}
         display: flex;
         flex-direction: column;
         gap: 18px;
+      }
+      .form-tabs {
+        display: inline-flex;
+        gap: 6px;
+        padding: 4px;
+        border: 1px solid #e2e8f0;
+        border-radius: 10px;
+        background: #f8fafc;
+      }
+      .tab-btn {
+        border: none;
+        border-radius: 8px;
+        padding: 8px 12px;
+        font-size: 0.82rem;
+        font-weight: 700;
+        color: #64748b;
+        background: transparent;
+        cursor: pointer;
+      }
+      .tab-btn.active {
+        background: #ffffff;
+        color: #1e293b;
+        box-shadow: 0 1px 2px rgba(0,0,0,0.08);
       }
       .form-group {
         display: flex;
@@ -316,6 +346,7 @@ export class HostFormComponent implements OnInit {
   private readonly allDeviceTypes = signal<DeviceTypeCatalogItem[]>([]);
   protected readonly sites = signal<SiteOption[]>([]);
   protected readonly deviceGroups = signal<DeviceGroupOption[]>([]);
+  protected readonly activeTab = signal<'general' | 'snmp'>('general');
 
   protected form = {
     name: '',
