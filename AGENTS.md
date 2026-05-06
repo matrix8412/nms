@@ -15,6 +15,7 @@
 - Otherwise, make a best
 
 ## Code generation
+- Write code, variable names, function names, file names, and technical identifiers in English.
 - Output only changed or relevant code sections
 - Do NOT repeat unchanged files or boilerplate
 - Prefer diffs or minimal snippets

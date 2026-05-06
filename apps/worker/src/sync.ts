@@ -1,6 +1,5 @@
 import { Prisma, prisma } from '@nms/db';
 import { decryptSecretOrNull } from '@nms/shared/secrets';
-import { ZabbixClient } from './zabbix.js';
 import { env } from './env.js';
 import { pollSnmpDevice } from './snmp.js';
 
@@ -46,6 +45,10 @@ function getMetricTimestampKey(itemKey: string): string | null {
     return 'uptime';
   }
   if (itemKey.startsWith('snmp.interface.')) {
+    const customMatch = /^snmp\.interface\.\d+\.custom\.(.+)$/.exec(itemKey);
+    if (customMatch?.[1]) {
+      return customMatch[1];
+    }
     return 'ifOperStatus';
   }
   if (itemKey.startsWith('snmp.custom.')) {
@@ -61,85 +64,6 @@ function isMetricDue(lastRecordedAt: Date | undefined, intervalSec: number, now:
   return now.getTime() - lastRecordedAt.getTime() >= intervalSec * 1000;
 }
 
-const DEFAULT_KEYS_BY_TYPE: Record<string, string[]> = {
-  default: ['system.cpu.load[percpu,avg1]', 'vm.memory.size[available]', 'icmpping'],
-  router: ['net.if.in[ifHCInOctets.1]', 'net.if.out[ifHCOutOctets.1]', 'icmpping'],
-  switch: ['net.if.in[ifHCInOctets.1]', 'net.if.out[ifHCOutOctets.1]', 'icmpping'],
-};
-
-function parseNumeric(value: string): number | null {
-  const numeric = Number(value);
-  return Number.isFinite(numeric) ? numeric : null;
-}
-
-function toApiUrl(raw: string): string {
-  const trimmed = raw.trim();
-  if (!trimmed) {
-    return '';
-  }
-  return trimmed.endsWith('/api_jsonrpc.php') ? trimmed : `${trimmed.replace(/\/+$/, '')}/api_jsonrpc.php`;
-}
-
-async function resolveZabbixConnection() {
-  const integration = await prisma.integrationConfig.findUnique({
-    where: { provider: 'zabbix' },
-    select: { enabled: true, settings: true },
-  });
-
-  const settings = integration?.settings && typeof integration.settings === 'object'
-    ? integration.settings as Record<string, unknown>
-    : null;
-
-  const url = toApiUrl(String(settings?.url ?? ''));
-  const token = String(settings?.apiToken ?? '').trim();
-
-  if (integration?.enabled && url && token) {
-    return { url, token, user: '', pass: '' };
-  }
-
-  if (env.ZABBIX_URL && env.ZABBIX_USER && env.ZABBIX_PASS) {
-    return { url: `${env.ZABBIX_URL}/api_jsonrpc.php`, token: '', user: env.ZABBIX_USER, pass: env.ZABBIX_PASS };
-  }
-
-  return null;
-}
-
-async function resolveItemKeys(vendor?: string | null, deviceType?: string | null) {
-  const rows = await prisma.zabbixItemMapping.findMany({
-    where: {
-      enabled: true,
-      OR: [
-        { vendor: vendor ?? undefined, deviceType: deviceType ?? undefined },
-        { vendor: null, deviceType: deviceType ?? undefined },
-        { vendor: vendor ?? undefined, deviceType: null },
-        { vendor: null, deviceType: null },
-      ],
-    },
-  });
-
-  if (rows.length > 0) {
-    return [...new Set(rows.map((item: { itemKey: string }) => item.itemKey))];
-  }
-
-  if (vendor) {
-    const vendorRows = await prisma.zabbixItemMapping.findMany({
-      where: {
-        enabled: true,
-        vendor,
-      },
-      orderBy: [{ deviceType: 'desc' }, { itemKey: 'asc' }],
-    });
-
-    if (vendorRows.length > 0) {
-      return [...new Set(vendorRows.map((item: { itemKey: string }) => item.itemKey))];
-    }
-  }
-
-  return (
-    DEFAULT_KEYS_BY_TYPE[(deviceType ?? 'default').toLowerCase()] ?? DEFAULT_KEYS_BY_TYPE.default ?? []
-  );
-}
-
 export async function syncDevice(deviceId: string, force = false) {
   const device = await prisma.device.findUnique({
     where: { id: deviceId },
@@ -148,7 +72,6 @@ export async function syncDevice(deviceId: string, force = false) {
       ip: true,
       vendor: true,
       type: true,
-      zabbixHostId: true,
       snmpVersion: true,
       snmpPort: true,
       snmpCommunity: true,
@@ -162,53 +85,6 @@ export async function syncDevice(deviceId: string, force = false) {
   if (!device) return;
 
   const metrics: Prisma.DeviceMetricCreateManyInput[] = [];
-  const zabbixMetrics: Prisma.DeviceMetricCreateManyInput[] = [];
-
-  if (device.zabbixHostId) {
-    const zabbixConnection = await resolveZabbixConnection();
-    if (zabbixConnection) {
-      const client = new ZabbixClient(
-        zabbixConnection.url,
-        zabbixConnection.user,
-        zabbixConnection.pass,
-        zabbixConnection.token,
-      );
-
-      const itemKeys = await resolveItemKeys(device.vendor, device.type);
-      const items = await client.itemGet(device.zabbixHostId, itemKeys);
-      zabbixMetrics.push(
-        ...items.map((item) => ({
-          deviceId: device.id,
-          source: 'zabbix',
-          itemKey: item.key_,
-          itemName: item.name,
-          valueNumeric: parseNumeric(item.lastvalue),
-          valueText: item.lastvalue,
-          recordedAt: item.lastclock ? new Date(Number(item.lastclock) * 1000) : new Date(),
-          metadata: {
-            zabbixItemId: item.itemid,
-            units: item.units,
-          },
-        })),
-      );
-    }
-  }
-
-  if (zabbixMetrics.length > 0) {
-    const zabbixItemKeys = [...new Set(zabbixMetrics.map((metric) => metric.itemKey))];
-    await prisma.$transaction([
-      prisma.deviceMetric.deleteMany({
-        where: {
-          deviceId: device.id,
-          source: 'zabbix',
-          itemKey: { in: zabbixItemKeys },
-        },
-      }),
-      prisma.deviceMetric.createMany({
-        data: zabbixMetrics,
-      }),
-    ]);
-  }
 
   if (device.snmpVersion) {
     try {

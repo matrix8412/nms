@@ -9,7 +9,6 @@ Each environment should have isolated:
 - PostgreSQL/TimescaleDB database
 - Redis instance
 - SMTP provider or transactional email adapter
-- Zabbix credentials
 
 ## Required Processes
 
@@ -37,10 +36,7 @@ Mandatory:
 - `SMTP_PORT_DOCKER` (default `1025`)
 - `SMTP_USER`
 - `SMTP_PASS`
-- `ZABBIX_URL`
-- `ZABBIX_USER`
-- `ZABBIX_PASS`
-- `SYNC_CRON` (default every 30 minutes)
+- `SYNC_CRON` (default every 5 minutes)
 
 ## Deployment Steps
 
@@ -64,7 +60,6 @@ Compose stack file:
 ## Security Notes
 
 - Keep all secrets in runtime secret manager (never commit secrets).
-- Rotate SMTP and Zabbix credentials periodically.
 - Enable HTTPS in staging and production.
 - Ensure secure cookies by setting `NODE_ENV=production`.
 

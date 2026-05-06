@@ -22,9 +22,6 @@ jobs:
       SMTP_PORT: "1025"
       SMTP_USER: ""
       SMTP_PASS: ""
-      ZABBIX_URL: http://localhost/zabbix
-      ZABBIX_USER: Admin
-      ZABBIX_PASS: zabbix
       SYNC_CRON: "*/30 * * * *"
       CI: true
     steps:

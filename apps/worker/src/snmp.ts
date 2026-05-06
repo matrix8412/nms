@@ -15,6 +15,7 @@ type SnmpMetricKey = BuiltinSnmpMetricKey | (string & {});
 
 type SnmpTemplateConfig = {
   oid: string;
+  category: 'OVERVIEW' | 'INTERFACES';
   intervalSec: number;
 };
 
@@ -41,6 +42,12 @@ type SnmpPollMetric = {
   metadata?: Prisma.InputJsonValue;
 };
 
+type CustomMetricReadResult = {
+  metricKey: string;
+  scalar: unknown | null;
+  byIndex: Map<number, unknown>;
+};
+
 export type SnmpPollResult = {
   hostname: string | null;
   softwareVersion: string | null;
@@ -51,13 +58,13 @@ export type SnmpPollResult = {
 };
 
 const DEFAULT_TEMPLATE_CONFIGS: Record<BuiltinSnmpMetricKey, SnmpTemplateConfig> = {
-  hostname: { oid: '1.3.6.1.2.1.1.5.0', intervalSec: 1800 },
-  softwareVersion: { oid: '1.3.6.1.2.1.1.1.0', intervalSec: 1800 },
-  uptime: { oid: '1.3.6.1.2.1.1.3.0', intervalSec: 300 },
-  ifOperStatus: { oid: '1.3.6.1.2.1.2.2.1.8', intervalSec: 300 },
-  ifName: { oid: '1.3.6.1.2.1.31.1.1.1.1', intervalSec: 1800 },
-  ifDescription: { oid: '1.3.6.1.2.1.2.2.1.2', intervalSec: 1800 },
-  ifMac: { oid: '1.3.6.1.2.1.2.2.1.6', intervalSec: 1800 },
+  hostname: { oid: '1.3.6.1.2.1.1.5.0', category: 'OVERVIEW', intervalSec: 1800 },
+  softwareVersion: { oid: '1.3.6.1.2.1.1.1.0', category: 'OVERVIEW', intervalSec: 1800 },
+  uptime: { oid: '1.3.6.1.2.1.1.3.0', category: 'OVERVIEW', intervalSec: 300 },
+  ifOperStatus: { oid: '1.3.6.1.2.1.2.2.1.8', category: 'INTERFACES', intervalSec: 300 },
+  ifName: { oid: '1.3.6.1.2.1.31.1.1.1.1', category: 'INTERFACES', intervalSec: 1800 },
+  ifDescription: { oid: '1.3.6.1.2.1.2.2.1.2', category: 'INTERFACES', intervalSec: 1800 },
+  ifMac: { oid: '1.3.6.1.2.1.2.2.1.6', category: 'INTERFACES', intervalSec: 1800 },
 };
 
 const BUILTIN_TEMPLATE_KEYS = new Set<string>(Object.keys(DEFAULT_TEMPLATE_CONFIGS));
@@ -71,6 +78,10 @@ const OPER_STATUS_MAP: Record<number, string> = {
   6: 'notPresent',
   7: 'lowerLayerDown',
 };
+
+function normalizeTemplateCategory(category: string | null | undefined): 'OVERVIEW' | 'INTERFACES' {
+  return category === 'INTERFACES' ? 'INTERFACES' : 'OVERVIEW';
+}
 
 async function resolveMetricTemplates(vendor?: string | null, deviceType?: string | null): Promise<ResolvedSnmpTemplates> {
   const rows = await prisma.snmpOidTemplate.findMany({
@@ -96,6 +107,7 @@ async function resolveMetricTemplates(vendor?: string | null, deviceType?: strin
       bestByMetric.set(metricKey, {
         config: {
           oid: row.oid,
+          category: normalizeTemplateCategory(row.category),
           intervalSec: row.intervalSec,
         },
         score,
@@ -258,8 +270,11 @@ export async function pollSnmpDevice(
   const session = createSession(config);
 
   try {
-    const customMetricEntries = Object.entries(templates).filter(([metricKey]) => !BUILTIN_TEMPLATE_KEYS.has(metricKey));
-
+    const customMetricEntries = Object.entries(templates)
+      .filter(([metricKey]) => !BUILTIN_TEMPLATE_KEYS.has(metricKey))
+      .map(([metricKey, template]) => ({ metricKey, template }));
+    const customOverviewMetricEntries = customMetricEntries.filter((item) => item.template.category === 'OVERVIEW');
+    const customInterfaceMetricEntries = customMetricEntries.filter((item) => item.template.category === 'INTERFACES');
     const [hostnameValue, softwareVersionValue, uptimeValue, operStatuses, names, descriptions, macs, ...customValues] = await Promise.all([
       getScalar(session, templates.hostname.oid),
       getScalar(session, templates.softwareVersion.oid),
@@ -268,7 +283,16 @@ export async function pollSnmpDevice(
       walkColumn(session, templates.ifName.oid),
       walkColumn(session, templates.ifDescription.oid),
       walkColumn(session, templates.ifMac.oid),
-      ...customMetricEntries.map(([, template]) => getScalar(session, template.oid)),
+      ...customOverviewMetricEntries.map(async ({ metricKey, template }) => {
+        const scalar = await getScalar(session, template.oid);
+        const byIndex = new Map<number, unknown>();
+        return { metricKey, scalar, byIndex } satisfies CustomMetricReadResult;
+      }),
+      ...customInterfaceMetricEntries.map(async ({ metricKey, template }) => {
+        const byIndex = await walkColumn(session, template.oid);
+        const scalar = null;
+        return { metricKey, scalar, byIndex } satisfies CustomMetricReadResult;
+      }),
     ]);
 
     const hostname = stringifyValue(hostnameValue);
@@ -295,8 +319,36 @@ export async function pollSnmpDevice(
           description: stringifyValue(descriptions.get(index)),
           mac: Buffer.isBuffer(macValue) ? bufferToMac(macValue) : stringifyValue(macValue),
           operStatus: operCode != null ? (OPER_STATUS_MAP[operCode] ?? String(operCode)) : null,
+          metrics: null,
         } satisfies DeviceInterfaceDto;
       });
+
+    const interfaceByIndex = new Map<number, DeviceInterfaceDto>(interfaces.map((item) => [item.index, item]));
+    const customScalarMetrics: Array<{ metricKey: string; rawValue: unknown | null }> = [];
+    const customInterfaceMetrics: Array<{ metricKey: string; byIndex: Map<number, unknown> }> = [];
+
+    for (const item of customValues as CustomMetricReadResult[]) {
+      if (item.byIndex.size > 0) {
+        customInterfaceMetrics.push({ metricKey: item.metricKey, byIndex: item.byIndex });
+      } else {
+        customScalarMetrics.push({ metricKey: item.metricKey, rawValue: item.scalar });
+      }
+    }
+
+    for (const custom of customInterfaceMetrics) {
+      for (const [index, rawValue] of custom.byIndex.entries()) {
+        const iface = interfaceByIndex.get(index);
+        if (!iface) continue;
+        const textValue = stringifyValue(rawValue);
+        const numericValue = numberValue(rawValue);
+        const finalValue = numericValue ?? textValue ?? null;
+        if (finalValue == null) continue;
+        iface.metrics = {
+          ...(iface.metrics ?? {}),
+          [custom.metricKey]: finalValue,
+        };
+      }
+    }
 
     const metrics: SnmpPollMetric[] = [
       {
@@ -332,8 +384,7 @@ export async function pollSnmpDevice(
           mac: item.mac,
         },
       })),
-      ...customMetricEntries.map(([metricKey], index) => {
-        const rawValue = customValues[index] ?? null;
+      ...customScalarMetrics.map(({ metricKey, rawValue }) => {
         return {
           templateKey: metricKey,
           itemKey: `snmp.custom.${metricKey}`,
@@ -342,6 +393,16 @@ export async function pollSnmpDevice(
           valueText: stringifyValue(rawValue),
         } satisfies SnmpPollMetric;
       }),
+      ...customInterfaceMetrics.flatMap(({ metricKey, byIndex }) =>
+        Array.from(byIndex.entries()).map(([index, rawValue]) => ({
+          templateKey: metricKey,
+          itemKey: `snmp.interface.${index}.custom.${metricKey}`,
+          itemName: `${formatCustomMetricLabel(metricKey)} (if${index})`,
+          valueNumeric: numberValue(rawValue),
+          valueText: stringifyValue(rawValue),
+          metadata: { index },
+        }) satisfies SnmpPollMetric),
+      ),
     ].filter((item) => item.valueNumeric != null || item.valueText != null);
 
     return {

@@ -1,4 +1,4 @@
-# Git Flow
+﻿# Git Flow
 
 ## Branches
 
@@ -18,7 +18,7 @@ Use Conventional Commits:
 - `docs:`
 
 Examples:
-- `feat(api): add zabbix sync endpoint`
+- `feat(api): add SNMP sync endpoint`
 - `fix(web): handle csrf token refresh on login`
 
 ## Pull Requests

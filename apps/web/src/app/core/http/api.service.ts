@@ -30,7 +30,6 @@ export class ApiService {
     vendor?: string | null;
     type?: string | null;
     siteId?: string | null;
-    zabbixHostId?: string | null;
     snmp?: {
       version: 'V2C' | 'V3';
       port?: number;
@@ -54,7 +53,6 @@ export class ApiService {
       vendor?: string | null;
       type?: string | null;
       siteId?: string | null;
-      zabbixHostId?: string | null;
       snmp?: {
         version: 'V2C' | 'V3';
         port?: number;
@@ -233,6 +231,7 @@ export class ApiService {
     deviceType?: string | null;
     metricKey: string;
     oid: string;
+    category: 'OVERVIEW' | 'INTERFACES';
     intervalSec: number;
     enabled: boolean;
   }) {
@@ -244,6 +243,7 @@ export class ApiService {
     deviceType?: string | null;
     metricKey: string;
     oid: string;
+    category: 'OVERVIEW' | 'INTERFACES';
     intervalSec: number;
     enabled: boolean;
   }) {
@@ -288,24 +288,4 @@ export class ApiService {
     return this.http.delete<{ ok: boolean }>(`/api/roles/${id}`);
   }
 
-  // ── Zabbix ───────────────────────────────────────────────
-  triggerZabbixSync(deviceIds?: string[]) {
-    return this.http.post<{ ok: boolean; enqueued: number }>('/api/zabbix/sync', {
-      deviceIds,
-      force: true,
-    });
-  }
-
-  getZabbixTemplates() {
-    return this.http.get<{ data: Array<{ id: string; host: string; name: string }> }>('/api/zabbix/templates');
-  }
-
-  mapZabbixTemplate(payload: {
-    templateId: string;
-    vendor?: string | null;
-    deviceType?: string | null;
-    replace?: boolean;
-  }) {
-    return this.http.post<{ ok: boolean; imported: number; totalItems: number }>('/api/zabbix/templates/map', payload);
-  }
 }

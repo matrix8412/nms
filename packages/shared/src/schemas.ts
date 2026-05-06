@@ -124,7 +124,6 @@ export const deviceCreateSchema = z.object({
   vendor: z.string().trim().max(120).optional().nullable(),
   type: z.string().trim().max(120).optional().nullable(),
   siteId: z.string().trim().min(1).max(120).optional().nullable(),
-  zabbixHostId: z.string().trim().max(120).optional().nullable(),
   snmp: deviceSnmpSchema.optional().nullable(),
   deviceGroupIds: z.array(z.string().min(1)).default([]),
 });
@@ -135,7 +134,6 @@ export const deviceUpdateSchema = z.object({
   vendor: z.string().trim().max(120).optional().nullable(),
   type: z.string().trim().max(120).optional().nullable(),
   siteId: z.string().trim().min(1).max(120).optional().nullable(),
-  zabbixHostId: z.string().trim().max(120).optional().nullable(),
   snmp: deviceSnmpUpdateSchema.optional().nullable(),
   deviceGroupIds: z.array(z.string().min(1)).optional(),
 });
@@ -153,7 +151,3 @@ export const userUpdateSchema = z.object({
   groupIds: z.array(z.string().min(1)).optional(),
 });
 
-export const zabbixSyncRequestSchema = z.object({
-  deviceIds: z.array(z.string().min(1)).optional(),
-  force: z.boolean().default(false),
-});

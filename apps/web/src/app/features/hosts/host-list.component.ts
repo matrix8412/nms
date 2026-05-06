@@ -10,7 +10,7 @@ import { matchesSearchText, normalizeSearchText } from '../../core/utils/search.
 import { HostFormComponent } from './host-form.component';
 import type { DeviceDto } from '@nms/shared';
 
-type SortField = 'icmpStatus' | 'name' | 'ip' | 'vendor' | 'type' | 'site' | 'zabbixHostId';
+type SortField = 'icmpStatus' | 'name' | 'ip' | 'vendor' | 'type' | 'site';
 type SortDir = 'asc' | 'desc';
 
 @Component({
@@ -130,10 +130,6 @@ type SortDir = 'asc' | 'desc';
               </th>
               <th class="sortable">
                 <div class="header-cell">
-                  <button type="button" class="header-sort" (click)="toggleSort('zabbixHostId')">
-                    Zabbix ID
-                    <span class="sort-icon material-icons">{{ getSortIcon('zabbixHostId') }}</span>
-                  </button>
                 </div>
               </th>
               <th class="sortable">
@@ -199,7 +195,6 @@ type SortDir = 'asc' | 'desc';
                   </div>
                   <ng-template #noDeviceGroups>—</ng-template>
                 </td>
-                <td class="mono">{{ host.zabbixHostId || '—' }}</td>
                 <td>
                   <span class="type-badge" *ngIf="host.site">{{ host.site.name }}</span>
                   <span *ngIf="!host.site">—</span>
@@ -774,8 +769,6 @@ export class HostListComponent implements OnInit, OnDestroy {
         return (host.type ?? '').toString().toLowerCase();
       case 'site':
         return (host.site?.name ?? '').toString().toLowerCase();
-      case 'zabbixHostId':
-        return (host.zabbixHostId ?? '').toString().toLowerCase();
       default:
         return '';
     }

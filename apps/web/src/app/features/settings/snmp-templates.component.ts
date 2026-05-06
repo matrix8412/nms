@@ -18,13 +18,14 @@ interface SnmpTemplateItem {
   deviceType: string | null;
   metricKey: SnmpMetricKey;
   oid: string;
+  category: 'OVERVIEW' | 'INTERFACES';
   intervalSec: number;
   enabled: boolean;
   createdAt: string;
 }
 
 type SnmpMetricKey = string;
-type SortField = 'vendor' | 'deviceType' | 'metricKey' | 'oid' | 'intervalSec';
+type SortField = 'vendor' | 'deviceType' | 'metricKey' | 'oid' | 'category' | 'intervalSec';
 type SortDir = 'asc' | 'desc';
 
 const METRIC_KEY_OPTIONS: Array<{ value: string; label: string }> = [
@@ -101,6 +102,14 @@ const METRIC_KEY_OPTIONS: Array<{ value: string; label: string }> = [
             </th>
             <th class="sortable">
               <div class="header-cell">
+                <button type="button" class="header-sort" (click)="toggleSort('category')">
+                  Category
+                  <span class="sort-icon material-icons">{{ getSortIcon('category') }}</span>
+                </button>
+              </div>
+            </th>
+            <th class="sortable">
+              <div class="header-cell">
                 <button type="button" class="header-sort" (click)="toggleSort('intervalSec')">
                   Interval
                   <span class="sort-icon material-icons">{{ getSortIcon('intervalSec') }}</span>
@@ -117,6 +126,7 @@ const METRIC_KEY_OPTIONS: Array<{ value: string; label: string }> = [
             <td>{{ item.deviceType || 'Any' }}</td>
             <td>{{ metricKeyLabel(item.metricKey) }}</td>
             <td class="cell-code">{{ item.oid }}</td>
+            <td>{{ item.category === 'INTERFACES' ? 'Interfaces' : 'Overview' }}</td>
             <td>{{ formatInterval(item.intervalSec) }}</td>
             <td>
               <span class="status-badge" [class.enabled]="item.enabled">{{ item.enabled ? 'Enabled' : 'Disabled' }}</span>
@@ -182,6 +192,13 @@ const METRIC_KEY_OPTIONS: Array<{ value: string; label: string }> = [
         <label class="form-label">
           OID
           <input class="form-input" [(ngModel)]="form.oid" name="oid" placeholder="1.3.6.1..." />
+        </label>
+        <label class="form-label">
+          Category
+          <select class="form-input" [(ngModel)]="form.category" name="category">
+            <option value="OVERVIEW">Overview</option>
+            <option value="INTERFACES">Interfaces</option>
+          </select>
         </label>
         <label class="form-label">
           Poll Interval (seconds)
@@ -273,6 +290,7 @@ export class SnmpTemplatesComponent {
     deviceType: string;
     metricKey: SnmpMetricKey;
     oid: string;
+    category: 'OVERVIEW' | 'INTERFACES';
     intervalSec: number;
     enabled: boolean;
   } = {
@@ -280,6 +298,7 @@ export class SnmpTemplatesComponent {
     deviceType: '',
     metricKey: 'hostname',
     oid: '',
+    category: 'OVERVIEW',
     intervalSec: 1800,
     enabled: true,
   };
@@ -291,7 +310,7 @@ export class SnmpTemplatesComponent {
     }
 
     return this.items().filter((item) =>
-      [item.vendor ?? '', item.deviceType ?? '', item.metricKey, item.oid, String(item.intervalSec)].some((value) => value.toLowerCase().includes(query)),
+      [item.vendor ?? '', item.deviceType ?? '', item.metricKey, item.oid, item.category, String(item.intervalSec)].some((value) => value.toLowerCase().includes(query)),
     );
   });
 
@@ -362,6 +381,7 @@ export class SnmpTemplatesComponent {
     this.form.deviceType = '';
     this.form.metricKey = 'hostname';
     this.form.oid = '';
+    this.form.category = 'OVERVIEW';
     this.form.intervalSec = 1800;
     this.form.enabled = true;
     this.panelOpen.set(true);
@@ -373,6 +393,7 @@ export class SnmpTemplatesComponent {
     this.form.deviceType = item.deviceType ?? '';
     this.form.metricKey = item.metricKey;
     this.form.oid = item.oid;
+    this.form.category = item.category;
     this.form.intervalSec = item.intervalSec;
     this.form.enabled = item.enabled;
     this.panelOpen.set(true);
@@ -384,6 +405,7 @@ export class SnmpTemplatesComponent {
       deviceType: this.normalizeOptional(this.form.deviceType),
       metricKey: this.normalizeMetricKey(this.form.metricKey),
       oid: this.form.oid.trim(),
+      category: this.form.category,
       intervalSec: Math.max(30, Math.min(86400, Number(this.form.intervalSec) || 1800)),
       enabled: this.form.enabled,
     };

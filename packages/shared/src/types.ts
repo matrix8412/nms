@@ -41,6 +41,7 @@ export type DeviceInterfaceDto = {
   description?: string | null;
   mac?: string | null;
   operStatus?: string | null;
+  metrics?: Record<string, string | number | null> | null;
 };
 
 export type SiteDto = {
@@ -66,7 +67,6 @@ export type DeviceDto = {
   type?: string | null;
   siteId?: string | null;
   site?: SiteDto | null;
-  zabbixHostId?: string | null;
   snmp?: DeviceSnmpDto | null;
   snmpStatus: SnmpStatus;
   snmpLastSyncAt?: string | null;
@@ -74,6 +74,7 @@ export type DeviceDto = {
   snmpHostname?: string | null;
   snmpSoftwareVersion?: string | null;
   snmpUptimeTicks?: number | null;
+  snmpOverviewMetrics?: Record<string, string | number | null> | null;
   snmpInterfaces?: DeviceInterfaceDto[] | null;
   icmpStatus: IcmpStatus;
   lastPingAt?: string | null;

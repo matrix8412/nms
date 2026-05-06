@@ -23,6 +23,11 @@ function toEnabled(value: string) {
   return normalized === '1' || normalized === 'true' || normalized === 'yes';
 }
 
+function toCategory(value: string) {
+  const normalized = value.trim().toUpperCase();
+  return normalized === 'INTERFACES' ? ('INTERFACES' as const) : ('OVERVIEW' as const);
+}
+
 export async function GET(request: NextRequest) {
   return withErrorHandling(async () => {
     await requireAdmin(request);
@@ -30,8 +35,8 @@ export async function GET(request: NextRequest) {
       orderBy: [{ vendor: 'asc' }, { deviceType: 'asc' }, { metricKey: 'asc' }],
     });
     const csv = toCsv(
-      ['id', 'vendor', 'deviceType', 'metricKey', 'oid', 'intervalSec', 'enabled'],
-      templates.map((item) => [item.id, item.vendor ?? '', item.deviceType ?? '', item.metricKey, item.oid, item.intervalSec, item.enabled]),
+      ['id', 'vendor', 'deviceType', 'metricKey', 'oid', 'category', 'intervalSec', 'enabled'],
+      templates.map((item) => [item.id, item.vendor ?? '', item.deviceType ?? '', item.metricKey, item.oid, item.category, item.intervalSec, item.enabled]),
     );
     return new NextResponse(csv, { headers: { 'content-type': 'text/csv; charset=utf-8' } });
   });
@@ -54,6 +59,7 @@ export async function POST(request: NextRequest) {
         deviceType,
         metricKey,
         oid,
+        category: toCategory(row.category ?? ''),
         intervalSec: toInterval(row.intervalSec ?? ''),
         enabled: toEnabled(row.enabled ?? 'true'),
       };

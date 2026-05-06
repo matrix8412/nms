@@ -19,6 +19,7 @@ const createSchema = z.object({
   deviceType: z.string().trim().max(120).optional().nullable(),
   metricKey: metricKeySchema,
   oid: z.string().trim().min(3).max(255),
+  category: z.enum(['OVERVIEW', 'INTERFACES']).default('OVERVIEW'),
   intervalSec: z.coerce.number().int().min(30).max(86400).default(1800),
   enabled: z.boolean().default(true),
 });
@@ -44,6 +45,7 @@ export async function POST(request: NextRequest) {
         deviceType: payload.deviceType || null,
         metricKey: payload.metricKey,
         oid: payload.oid,
+        category: payload.category,
         intervalSec: payload.intervalSec,
         enabled: payload.enabled,
       },

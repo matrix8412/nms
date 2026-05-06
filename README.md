@@ -1,4 +1,4 @@
-# NMS System Monorepo
+﻿# NMS System Monorepo
 
 Production-oriented Network Management System for inventory, management, and monitoring of network devices.
 
@@ -9,7 +9,7 @@ Production-oriented Network Management System for inventory, management, and mon
 - Frontend: Angular standalone + Angular Material
 - Auth: custom DB-backed sessions + CSRF + Redis rate limiting + audit logging
 - Jobs: BullMQ + Redis (`device-sync`, `device-commands`) with separate worker/scheduler apps
-- Integrations: Zabbix API wrapper + configurable item mapping
+
 
 ## Repository Layout
 

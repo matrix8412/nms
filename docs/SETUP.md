@@ -1,4 +1,4 @@
-# Local Setup
+﻿# Local Setup
 
 ## 1. Prerequisites
 
@@ -23,7 +23,6 @@ Required values:
 - `REDIS_URL`
 - `ENCRYPTION_KEY`
 - SMTP values (`SMTP_HOST`, `SMTP_PORT`, `EMAIL_FROM`)
-- Zabbix values (`ZABBIX_URL`, `ZABBIX_USER`, `ZABBIX_PASS`)
 
 ## 3. Start Local Infrastructure
 
@@ -70,7 +69,6 @@ corepack pnpm --filter @nms/scheduler dev
 - API health: `GET http://localhost:3000/api/health`
 - Frontend loads at `http://localhost:4200`
 - Mailhog receives verification/reset emails
-- Redis queue receives jobs from `POST /api/zabbix/sync`
 
 ## 8. Common Commands
 

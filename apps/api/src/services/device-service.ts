@@ -23,7 +23,6 @@ type DeviceView = {
   vendor: string | null;
   type: string | null;
   siteId: string | null;
-  zabbixHostId: string | null;
   snmpVersion: 'V2C' | 'V3' | null;
   snmpPort: number;
   snmpUsername: string | null;
@@ -97,24 +96,33 @@ function normalizeInterfaces(value: Prisma.JsonValue): DeviceInterfaceDto[] | nu
   const items: DeviceInterfaceDto[] = [];
 
   for (const entry of value) {
-      if (!entry || typeof entry !== 'object' || Array.isArray(entry)) {
-        continue;
-      }
+    if (!entry || typeof entry !== 'object' || Array.isArray(entry)) {
+      continue;
+    }
 
-      const record = entry as Record<string, unknown>;
-      const index = Number(record.index);
-      const name = typeof record.name === 'string' ? record.name : '';
-      if (!Number.isInteger(index) || !name) {
-        continue;
-      }
+    const record = entry as Record<string, unknown>;
+    const index = Number(record.index);
+    const name = typeof record.name === 'string' ? record.name : '';
+    if (!Number.isInteger(index) || !name) {
+      continue;
+    }
 
-      items.push({
-        index,
-        name,
-        description: typeof record.description === 'string' ? record.description : null,
-        mac: typeof record.mac === 'string' ? record.mac : null,
-        operStatus: typeof record.operStatus === 'string' ? record.operStatus : null,
-      });
+    const rawMetrics = record.metrics;
+    let metricsRecord: Record<string, string | number | null> | null = null;
+    if (rawMetrics && typeof rawMetrics === 'object' && !Array.isArray(rawMetrics)) {
+      const entries = Object.entries(rawMetrics as Record<string, unknown>)
+        .filter(([, metricValue]) => metricValue === null || typeof metricValue === 'string' || typeof metricValue === 'number');
+      metricsRecord = entries.length ? (Object.fromEntries(entries) as Record<string, string | number | null>) : null;
+    }
+
+    items.push(({
+      index,
+      name,
+      description: typeof record.description === 'string' ? record.description : null,
+      mac: typeof record.mac === 'string' ? record.mac : null,
+      operStatus: typeof record.operStatus === 'string' ? record.operStatus : null,
+      ...(metricsRecord ? { metrics: metricsRecord } : {}),
+    } as DeviceInterfaceDto));
   }
 
   return items.length > 0 ? items : [];
@@ -134,7 +142,6 @@ function toDeviceDto(
     type: device.type,
     siteId: device.siteId,
     site,
-    zabbixHostId: device.zabbixHostId,
     snmp: device.snmpVersion
       ? {
           version: device.snmpVersion,
@@ -153,6 +160,7 @@ function toDeviceDto(
     snmpHostname: device.snmpHostname,
     snmpSoftwareVersion: device.snmpSoftwareVersion,
     snmpUptimeTicks: device.snmpUptimeTicks,
+    snmpOverviewMetrics: null,
     snmpInterfaces: normalizeInterfaces(device.snmpInterfaces),
     icmpStatus: device.icmpStatus as DeviceDto['icmpStatus'],
     lastPingAt: device.lastPingAt?.toISOString() ?? null,
@@ -338,7 +346,7 @@ export async function listDevices(session: NonNullable<SessionUser>, search?: st
         DeviceView[]
       >(
         Prisma.sql`
-          SELECT d."id", d."name", d."ip", d."vendor", d."type", d."zabbixHostId",
+          SELECT d."id", d."name", d."ip", d."vendor", d."type",
                  d."siteId",
                  d."snmpVersion"::text, d."snmpPort", d."snmpUsername",
                  d."snmpAuthProtocol"::text, d."snmpPrivProtocol"::text, d."snmpCommunity",
@@ -368,7 +376,7 @@ export async function listDevices(session: NonNullable<SessionUser>, search?: st
         DeviceView[]
       >(
         Prisma.sql`
-          SELECT DISTINCT d."id", d."name", d."ip", d."vendor", d."type", d."zabbixHostId",
+          SELECT DISTINCT d."id", d."name", d."ip", d."vendor", d."type",
                  d."siteId",
                  d."snmpVersion"::text, d."snmpPort", d."snmpUsername",
                  d."snmpAuthProtocol"::text, d."snmpPrivProtocol"::text, d."snmpCommunity",
@@ -424,7 +432,6 @@ export async function listDevices(session: NonNullable<SessionUser>, search?: st
         vendor: true,
         type: true,
         siteId: true,
-        zabbixHostId: true,
         snmpVersion: true,
         snmpPort: true,
         snmpUsername: true,
@@ -498,11 +505,6 @@ export async function getDeviceById(deviceId: string, session: NonNullable<Sessi
           },
         },
       },
-      metrics: {
-        where: { source: 'zabbix' },
-        orderBy: { recordedAt: 'desc' },
-        take: 500,
-      },
     },
   });
 
@@ -559,15 +561,33 @@ export async function getDeviceById(deviceId: string, session: NonNullable<Sessi
     .sort((left, right) => left.recordedAt.localeCompare(right.recordedAt))
     .slice(-720);
 
-  const metrics = device.metrics.map((metric) => ({
-    source: metric.source,
-    itemKey: metric.itemKey,
-    itemName: metric.itemName,
-    valueNumeric: metric.valueNumeric,
-    valueText: metric.valueText,
-    recordedAt: metric.recordedAt.toISOString(),
-    metadata: metric.metadata,
-  }));
+  const snmpOverviewRows = await prisma.deviceMetric.findMany({
+    where: {
+      deviceId: device.id,
+      source: 'snmp',
+      itemKey: { startsWith: 'snmp.custom.' },
+    },
+    select: {
+      itemKey: true,
+      valueNumeric: true,
+      valueText: true,
+      recordedAt: true,
+    },
+    orderBy: { recordedAt: 'desc' },
+    take: 500,
+  });
+
+  const snmpOverviewMetrics: Record<string, string | number | null> = {};
+  for (const metric of snmpOverviewRows) {
+    const metricKey = metric.itemKey.slice('snmp.custom.'.length);
+    if (!metricKey) {
+      continue;
+    }
+    if (snmpOverviewMetrics[metricKey] !== undefined) {
+      continue;
+    }
+    snmpOverviewMetrics[metricKey] = metric.valueNumeric ?? metric.valueText ?? null;
+  }
 
   return {
     ...toDeviceDto(
@@ -578,7 +598,6 @@ export async function getDeviceById(deviceId: string, session: NonNullable<Sessi
         vendor: device.vendor,
         type: device.type,
         siteId: device.siteId,
-        zabbixHostId: device.zabbixHostId,
         snmpVersion: device.snmpVersion,
         snmpPort: device.snmpPort,
         snmpUsername: device.snmpUsername,
@@ -602,7 +621,8 @@ export async function getDeviceById(deviceId: string, session: NonNullable<Sessi
       device.groups.map((item) => item.deviceGroup),
       toSiteDto(device.site as DeviceSiteRecord | null),
     ),
-    metrics,
+    snmpOverviewMetrics: Object.keys(snmpOverviewMetrics).length > 0 ? snmpOverviewMetrics : null,
+    metrics: [],
     icmpHistory,
   };
 }
@@ -613,7 +633,6 @@ export async function createDevice(data: {
   vendor?: string | null;
   type?: string | null;
   siteId?: string | null;
-  zabbixHostId?: string | null;
   snmp?: DeviceSnmpInput | null;
   deviceGroupIds: string[];
 }) {
@@ -626,7 +645,6 @@ export async function createDevice(data: {
       vendor: data.vendor,
       type: data.type,
       siteId: data.siteId,
-      zabbixHostId: data.zabbixHostId,
       ...buildSnmpCreateData(data.snmp),
       groups: {
         create: data.deviceGroupIds.map((deviceGroupId) => ({
@@ -654,7 +672,6 @@ export async function updateDevice(
     vendor?: string | null;
     type?: string | null;
     siteId?: string | null;
-    zabbixHostId?: string | null;
     snmp?: DeviceSnmpInput | null;
     deviceGroupIds: string[];
   }>,
@@ -672,7 +689,6 @@ export async function updateDevice(
       vendor: true,
       type: true,
       siteId: true,
-      zabbixHostId: true,
       snmpVersion: true,
       snmpPort: true,
       snmpUsername: true,
@@ -707,7 +723,6 @@ export async function updateDevice(
         vendor: data.vendor,
         type: data.type,
         siteId: data.siteId,
-        zabbixHostId: data.zabbixHostId,
         ...resolveSnmpUpdateData(existing, data.snmp),
       },
     });

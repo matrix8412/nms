@@ -107,22 +107,22 @@ async function seedSnmpTemplates() {
   }
 
   const templates = [
-    { vendor: null, deviceType: null, metricKey: 'hostname', oid: '1.3.6.1.2.1.1.5.0', intervalSec: 1800 },
-    { vendor: null, deviceType: null, metricKey: 'softwareVersion', oid: '1.3.6.1.2.1.1.1.0', intervalSec: 1800 },
-    { vendor: null, deviceType: null, metricKey: 'uptime', oid: '1.3.6.1.2.1.1.3.0', intervalSec: 300 },
-    { vendor: null, deviceType: null, metricKey: 'ifOperStatus', oid: '1.3.6.1.2.1.2.2.1.8', intervalSec: 300 },
-    { vendor: null, deviceType: null, metricKey: 'ifName', oid: '1.3.6.1.2.1.31.1.1.1.1', intervalSec: 1800 },
-    { vendor: null, deviceType: null, metricKey: 'ifDescription', oid: '1.3.6.1.2.1.2.2.1.2', intervalSec: 1800 },
-    { vendor: null, deviceType: null, metricKey: 'ifMac', oid: '1.3.6.1.2.1.2.2.1.6', intervalSec: 1800 },
-    { vendor: 'MikroTik', deviceType: null, metricKey: 'softwareVersion', oid: '1.3.6.1.4.1.14988.1.1.7.4.0', intervalSec: 1800 },
-    { vendor: 'Mikrotik', deviceType: null, metricKey: 'softwareVersion', oid: '1.3.6.1.4.1.14988.1.1.7.4.0', intervalSec: 1800 },
-    { vendor: 'Mikrotik', deviceType: 'Router', metricKey: 'softwareVersion', oid: '1.3.6.1.4.1.14988.1.1.7.4.0', intervalSec: 1800 },
-    { vendor: 'Mikrotik', deviceType: 'Router', metricKey: 'hostname', oid: '1.3.6.1.2.1.1.5.0', intervalSec: 1800 },
-    { vendor: 'Mikrotik', deviceType: 'Router', metricKey: 'uptime', oid: '1.3.6.1.2.1.1.3.0', intervalSec: 300 },
-    { vendor: 'Mikrotik', deviceType: 'Router', metricKey: 'ifName', oid: '1.3.6.1.2.1.31.1.1.1.1', intervalSec: 1800 },
-    { vendor: 'Mikrotik', deviceType: 'Router', metricKey: 'ifDescription', oid: '1.3.6.1.2.1.2.2.1.2', intervalSec: 1800 },
-    { vendor: 'Mikrotik', deviceType: 'Router', metricKey: 'ifOperStatus', oid: '1.3.6.1.2.1.2.2.1.8', intervalSec: 300 },
-    { vendor: 'Mikrotik', deviceType: 'Router', metricKey: 'ifMac', oid: '1.3.6.1.2.1.2.2.1.6', intervalSec: 1800 },
+    { vendor: null, deviceType: null, metricKey: 'hostname', oid: '1.3.6.1.2.1.1.5.0', category: 'OVERVIEW', intervalSec: 1800 },
+    { vendor: null, deviceType: null, metricKey: 'softwareVersion', oid: '1.3.6.1.2.1.1.1.0', category: 'OVERVIEW', intervalSec: 1800 },
+    { vendor: null, deviceType: null, metricKey: 'uptime', oid: '1.3.6.1.2.1.1.3.0', category: 'OVERVIEW', intervalSec: 300 },
+    { vendor: null, deviceType: null, metricKey: 'ifOperStatus', oid: '1.3.6.1.2.1.2.2.1.8', category: 'INTERFACES', intervalSec: 300 },
+    { vendor: null, deviceType: null, metricKey: 'ifName', oid: '1.3.6.1.2.1.31.1.1.1.1', category: 'INTERFACES', intervalSec: 1800 },
+    { vendor: null, deviceType: null, metricKey: 'ifDescription', oid: '1.3.6.1.2.1.2.2.1.2', category: 'INTERFACES', intervalSec: 1800 },
+    { vendor: null, deviceType: null, metricKey: 'ifMac', oid: '1.3.6.1.2.1.2.2.1.6', category: 'INTERFACES', intervalSec: 1800 },
+    { vendor: 'MikroTik', deviceType: null, metricKey: 'softwareVersion', oid: '1.3.6.1.4.1.14988.1.1.7.4.0', category: 'OVERVIEW', intervalSec: 1800 },
+    { vendor: 'Mikrotik', deviceType: null, metricKey: 'softwareVersion', oid: '1.3.6.1.4.1.14988.1.1.7.4.0', category: 'OVERVIEW', intervalSec: 1800 },
+    { vendor: 'Mikrotik', deviceType: 'Router', metricKey: 'softwareVersion', oid: '1.3.6.1.4.1.14988.1.1.7.4.0', category: 'OVERVIEW', intervalSec: 1800 },
+    { vendor: 'Mikrotik', deviceType: 'Router', metricKey: 'hostname', oid: '1.3.6.1.2.1.1.5.0', category: 'OVERVIEW', intervalSec: 1800 },
+    { vendor: 'Mikrotik', deviceType: 'Router', metricKey: 'uptime', oid: '1.3.6.1.2.1.1.3.0', category: 'OVERVIEW', intervalSec: 300 },
+    { vendor: 'Mikrotik', deviceType: 'Router', metricKey: 'ifName', oid: '1.3.6.1.2.1.31.1.1.1.1', category: 'INTERFACES', intervalSec: 1800 },
+    { vendor: 'Mikrotik', deviceType: 'Router', metricKey: 'ifDescription', oid: '1.3.6.1.2.1.2.2.1.2', category: 'INTERFACES', intervalSec: 1800 },
+    { vendor: 'Mikrotik', deviceType: 'Router', metricKey: 'ifOperStatus', oid: '1.3.6.1.2.1.2.2.1.8', category: 'INTERFACES', intervalSec: 300 },
+    { vendor: 'Mikrotik', deviceType: 'Router', metricKey: 'ifMac', oid: '1.3.6.1.2.1.2.2.1.6', category: 'INTERFACES', intervalSec: 1800 },
   ] as const;
 
   for (const template of templates) {

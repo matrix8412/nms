@@ -12,9 +12,6 @@ const envSchema = z.object({
   SMTP_PORT: z.coerce.number().default(1025),
   SMTP_USER: z.string().default(''),
   SMTP_PASS: z.string().default(''),
-  ZABBIX_URL: z.string().default(''),
-  ZABBIX_USER: z.string().default(''),
-  ZABBIX_PASS: z.string().default(''),
 });
 
 export const env = envSchema.parse(process.env);

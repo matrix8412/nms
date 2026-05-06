@@ -8,7 +8,7 @@ import { z } from 'zod';
 const env = z
   .object({
     REDIS_URL: z.string().default('redis://localhost:6379'),
-    SYNC_CRON: z.string().default('*/30 * * * *'),
+    SYNC_CRON: z.string().default('*/5 * * * *'),
   })
   .parse(process.env);
 
@@ -93,10 +93,7 @@ async function loadIcmpSettings(): Promise<IcmpSettings> {
 async function enqueueSyncBatch() {
   const devices = await prisma.device.findMany({
     where: {
-      OR: [
-        { zabbixHostId: { not: null } },
-        { snmpVersion: { not: null } },
-      ],
+      snmpVersion: { not: null },
     },
     select: { id: true },
   });

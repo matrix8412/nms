@@ -83,8 +83,6 @@ interface SiteOption extends SearchableSelectOption {}
         </div>
 
         <div class="form-group">
-          <label for="zabbixHostId">Zabbix Host ID (optional)</label>
-          <input id="zabbixHostId" type="text" [(ngModel)]="form.zabbixHostId" name="zabbixHostId" placeholder="Leave empty for manual host" />
         </div>
 
         <div class="form-group" *ngIf="deviceGroups().length > 0">
@@ -354,7 +352,6 @@ export class HostFormComponent implements OnInit {
     vendor: '',
     type: '',
     siteId: '',
-    zabbixHostId: '',
     snmpVersion: '',
     snmpPort: 161,
     snmpCommunity: '',
@@ -374,7 +371,6 @@ export class HostFormComponent implements OnInit {
         vendor: this.host.vendor ?? '',
         type: this.host.type ?? '',
         siteId: this.host.siteId ?? '',
-        zabbixHostId: this.host.zabbixHostId ?? '',
         snmpVersion: this.host.snmp?.version ?? '',
         snmpPort: this.host.snmp?.port ?? 161,
         snmpCommunity: '',
@@ -438,7 +434,6 @@ export class HostFormComponent implements OnInit {
       vendor: this.form.vendor.trim() || null,
       type: this.form.type.trim() || null,
       siteId: this.form.siteId || null,
-      zabbixHostId: this.form.zabbixHostId.trim() || null,
       snmp,
       deviceGroupIds: this.form.deviceGroupIds,
     };

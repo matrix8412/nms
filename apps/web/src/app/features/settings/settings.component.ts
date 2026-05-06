@@ -34,28 +34,6 @@ import { CommonModule } from '@angular/common';
         </div>
       </div>
 
-      <!-- Zabbix Integration (read-only summary) -->
-      <div class="settings-card">
-        <div class="card-title">
-          <span class="material-icons">sync</span>
-          Zabbix Integration
-        </div>
-        <div class="setting-row">
-          <div>
-            <span class="setting-label">Auto Sync</span>
-            <span class="setting-desc">Automatically sync metrics from Zabbix</span>
-          </div>
-          <span class="setting-value">Enabled</span>
-        </div>
-        <div class="setting-row">
-          <div>
-            <span class="setting-label">Sync Interval</span>
-            <span class="setting-desc">How often device metrics are synced</span>
-          </div>
-          <span class="setting-value mono">5 min</span>
-        </div>
-      </div>
-
       <!-- Database (read-only) -->
       <div class="settings-card">
         <div class="card-title">
