@@ -1,6 +1,6 @@
 import { Prisma, prisma } from '@nms/db';
 import { encryptSecret } from '@nms/shared/secrets';
-import type { DeviceDto, DeviceInterfaceDto, SiteDto } from '@nms/shared';
+import type { DeviceDto, DeviceInterfaceDto, DeviceTagDto, SiteDto } from '@nms/shared';
 import type { SessionUser } from '@/lib/auth/session';
 import { env } from '@/lib/env';
 import { ApiError } from '@/lib/errors';
@@ -16,10 +16,16 @@ type DeviceSnmpInput = {
   privPassword?: string | null;
 };
 
+type DeviceTagInput = {
+  name: string;
+  color: string;
+};
+
 type DeviceView = {
   id: string;
-  name: string;
+  description: string;
   ip: string;
+  tags: Prisma.JsonValue;
   vendor: string | null;
   type: string | null;
   siteId: string | null;
@@ -42,6 +48,8 @@ type DeviceView = {
   lastPingAt: Date | null;
   lastPingDuration: number | null;
 };
+
+const tagColorPattern = /^#[0-9a-fA-F]{6}$/;
 
 type DeviceSiteRecord = {
   id: string;
@@ -128,6 +136,33 @@ function normalizeInterfaces(value: Prisma.JsonValue): DeviceInterfaceDto[] | nu
   return items.length > 0 ? items : [];
 }
 
+function normalizeDeviceTags(value: unknown): DeviceTagDto[] {
+  if (!Array.isArray(value)) {
+    return [];
+  }
+
+  const tags = new Map<string, DeviceTagDto>();
+  for (const item of value) {
+    if (!item || typeof item !== 'object' || Array.isArray(item)) {
+      continue;
+    }
+
+    const record = item as Record<string, unknown>;
+    const name = typeof record.name === 'string' ? record.name.trim() : '';
+    const color = typeof record.color === 'string' ? record.color.trim() : '';
+    if (!name || name.length > 40 || !tagColorPattern.test(color)) {
+      continue;
+    }
+
+    tags.set(name.toLocaleLowerCase('sk'), {
+      name,
+      color: color.toUpperCase(),
+    });
+  }
+
+  return [...tags.values()].slice(0, 12);
+}
+
 function toDeviceDto(
   device: DeviceView,
   groupIds: string[],
@@ -136,8 +171,9 @@ function toDeviceDto(
 ): DeviceDto {
   return {
     id: device.id,
-    name: device.name,
+    description: device.description,
     ip: device.ip,
+    tags: normalizeDeviceTags(device.tags),
     vendor: device.vendor,
     type: device.type,
     siteId: device.siteId,
@@ -346,8 +382,8 @@ export async function listDevices(session: NonNullable<SessionUser>, search?: st
         DeviceView[]
       >(
         Prisma.sql`
-          SELECT d."id", d."name", d."ip", d."vendor", d."type",
-                 d."siteId",
+          SELECT d."id", d."description", d."ip", d."vendor", d."type",
+                 d."tags", d."siteId",
                  d."snmpVersion"::text, d."snmpPort", d."snmpUsername",
                  d."snmpAuthProtocol"::text, d."snmpPrivProtocol"::text, d."snmpCommunity",
                  d."snmpAuthPassword", d."snmpPrivPassword", d."snmpStatus"::text,
@@ -355,10 +391,15 @@ export async function listDevices(session: NonNullable<SessionUser>, search?: st
                  d."snmpUptimeTicks", d."snmpInterfaces", d."icmpStatus"::text,
                  d."lastPingAt", d."lastPingDuration"
           FROM "Device" d
-          WHERE unaccent(lower(d."name")) LIKE unaccent(lower(${searchPattern}))
+          WHERE unaccent(lower(d."description")) LIKE unaccent(lower(${searchPattern}))
              OR unaccent(lower(d."ip")) LIKE unaccent(lower(${searchPattern}))
              OR unaccent(lower(COALESCE(d."vendor", ''))) LIKE unaccent(lower(${searchPattern}))
              OR unaccent(lower(COALESCE(d."type", ''))) LIKE unaccent(lower(${searchPattern}))
+             OR EXISTS (
+               SELECT 1
+               FROM jsonb_array_elements(d."tags") AS device_tag(value)
+               WHERE unaccent(lower(device_tag.value->>'name')) LIKE unaccent(lower(${searchPattern}))
+             )
              OR EXISTS (
                SELECT 1
                FROM "Site" s
@@ -368,7 +409,7 @@ export async function listDevices(session: NonNullable<SessionUser>, search?: st
                    OR unaccent(lower(COALESCE(s."city", ''))) LIKE unaccent(lower(${searchPattern}))
                  )
              )
-          ORDER BY d."name" ASC
+          ORDER BY d."description" ASC
         `,
       );
     } else if (userGroupIds.length > 0) {
@@ -376,8 +417,8 @@ export async function listDevices(session: NonNullable<SessionUser>, search?: st
         DeviceView[]
       >(
         Prisma.sql`
-          SELECT DISTINCT d."id", d."name", d."ip", d."vendor", d."type",
-                 d."siteId",
+          SELECT DISTINCT d."id", d."description", d."ip", d."vendor", d."type",
+                 d."tags", d."siteId",
                  d."snmpVersion"::text, d."snmpPort", d."snmpUsername",
                  d."snmpAuthProtocol"::text, d."snmpPrivProtocol"::text, d."snmpCommunity",
                  d."snmpAuthPassword", d."snmpPrivPassword", d."snmpStatus"::text,
@@ -389,10 +430,15 @@ export async function listDevices(session: NonNullable<SessionUser>, search?: st
           JOIN "GroupDeviceAccess" gda ON gda."deviceGroupId" = dgd."deviceGroupId"
           WHERE gda."groupId" IN (${Prisma.join(userGroupIds)})
             AND (
-              unaccent(lower(d."name")) LIKE unaccent(lower(${searchPattern}))
+              unaccent(lower(d."description")) LIKE unaccent(lower(${searchPattern}))
               OR unaccent(lower(d."ip")) LIKE unaccent(lower(${searchPattern}))
               OR unaccent(lower(COALESCE(d."vendor", ''))) LIKE unaccent(lower(${searchPattern}))
               OR unaccent(lower(COALESCE(d."type", ''))) LIKE unaccent(lower(${searchPattern}))
+              OR EXISTS (
+                SELECT 1
+                FROM jsonb_array_elements(d."tags") AS device_tag(value)
+                WHERE unaccent(lower(device_tag.value->>'name')) LIKE unaccent(lower(${searchPattern}))
+              )
               OR EXISTS (
                 SELECT 1
                 FROM "Site" s
@@ -403,7 +449,7 @@ export async function listDevices(session: NonNullable<SessionUser>, search?: st
                   )
               )
             )
-          ORDER BY d."name" ASC
+          ORDER BY d."description" ASC
         `,
       );
     }
@@ -427,8 +473,9 @@ export async function listDevices(session: NonNullable<SessionUser>, search?: st
             },
       select: {
         id: true,
-        name: true,
+        description: true,
         ip: true,
+        tags: true,
         vendor: true,
         type: true,
         siteId: true,
@@ -452,7 +499,7 @@ export async function listDevices(session: NonNullable<SessionUser>, search?: st
         lastPingDuration: true,
         site: true,
       },
-      orderBy: { name: 'asc' },
+      orderBy: { description: 'asc' },
     });
   }
 
@@ -593,8 +640,9 @@ export async function getDeviceById(deviceId: string, session: NonNullable<Sessi
     ...toDeviceDto(
       {
         id: device.id,
-        name: device.name,
+        description: device.description,
         ip: device.ip,
+        tags: device.tags,
         vendor: device.vendor,
         type: device.type,
         siteId: device.siteId,
@@ -628,8 +676,9 @@ export async function getDeviceById(deviceId: string, session: NonNullable<Sessi
 }
 
 export async function createDevice(data: {
-  name: string;
+  description: string;
   ip: string;
+  tags: DeviceTagInput[];
   vendor?: string | null;
   type?: string | null;
   siteId?: string | null;
@@ -640,8 +689,9 @@ export async function createDevice(data: {
 
   const device = await prisma.device.create({
     data: {
-      name: data.name,
+      description: data.description,
       ip: data.ip,
+      tags: normalizeDeviceTags(data.tags) as unknown as Prisma.InputJsonValue,
       vendor: data.vendor,
       type: data.type,
       siteId: data.siteId,
@@ -667,8 +717,9 @@ export async function createDevice(data: {
 export async function updateDevice(
   id: string,
   data: Partial<{
-    name: string;
+    description: string;
     ip: string;
+    tags: DeviceTagInput[];
     vendor?: string | null;
     type?: string | null;
     siteId?: string | null;
@@ -684,8 +735,9 @@ export async function updateDevice(
     where: { id },
     select: {
       id: true,
-      name: true,
+      description: true,
       ip: true,
+      tags: true,
       vendor: true,
       type: true,
       siteId: true,
@@ -718,8 +770,9 @@ export async function updateDevice(
     await tx.device.update({
       where: { id },
       data: {
-        name: data.name,
+        description: data.description,
         ip: data.ip,
+        tags: data.tags === undefined ? undefined : (normalizeDeviceTags(data.tags) as unknown as Prisma.InputJsonValue),
         vendor: data.vendor,
         type: data.type,
         siteId: data.siteId,

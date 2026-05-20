@@ -59,10 +59,16 @@ export type SiteDto = {
   updatedAt: string;
 };
 
+export type DeviceTagDto = {
+  name: string;
+  color: string;
+};
+
 export type DeviceDto = {
   id: string;
-  name: string;
+  description: string;
   ip: string;
+  tags: DeviceTagDto[];
   vendor?: string | null;
   type?: string | null;
   siteId?: string | null;

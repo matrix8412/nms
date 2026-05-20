@@ -24,7 +24,7 @@ import type { DeviceDto } from '@nms/shared';
           Hosts
         </a>
         <span class="separator">/</span>
-        <span class="current">{{ host()?.name || 'Loading...' }}</span>
+        <span class="current">{{ host()?.description || 'Loading...' }}</span>
       </div>
       <button *ngIf="host()" class="btn btn-primary" (click)="editPanelOpen.set(true)">
         <span class="material-icons">edit</span>
@@ -49,8 +49,24 @@ import type { DeviceDto } from '@nms/shared';
           Host Information
         </div>
         <div class="info-rows">
-          <div class="info-row"><span class="info-label">Name</span><span class="info-value">{{ host()!.name }}</span></div>
-          <div class="info-row"><span class="info-label">IP Address</span><span class="info-value mono">{{ host()!.ip }}</span></div>
+          <div class="info-row"><span class="info-label">Description</span><span class="info-value">{{ host()!.description }}</span></div>
+          <div class="info-row"><span class="info-label">IP/Hostname</span><span class="info-value mono">{{ host()!.ip }}</span></div>
+          <div class="info-row">
+            <span class="info-label">Tags</span>
+            <span class="info-value">
+              <span class="tag-badges" *ngIf="host()!.tags?.length; else noTags">
+                <span
+                  class="tag-badge"
+                  *ngFor="let tag of host()!.tags"
+                  [style.background-color]="tag.color"
+                  [style.color]="tagTextColor(tag.color)"
+                >
+                  {{ tag.name }}
+                </span>
+              </span>
+              <ng-template #noTags>—</ng-template>
+            </span>
+          </div>
           <div class="info-row"><span class="info-label">Vendor</span><span class="info-value">{{ host()!.vendor || '—' }}</span></div>
           <div class="info-row">
             <span class="info-label">Type</span>
@@ -195,6 +211,8 @@ import type { DeviceDto } from '@nms/shared';
       .info-value { font-size: 0.88rem; color: #1a2332; font-weight: 600; }
       .mono { font-family: 'JetBrains Mono', monospace; font-size: 0.82rem; }
       .type-badge { display: inline-block; padding: 2px 10px; border-radius: 20px; background: #e0f2fe; color: #0369a1; font-size: 0.78rem; font-weight: 600; }
+      .tag-badges { display: flex; flex-wrap: wrap; gap: 6px; justify-content: flex-end; }
+      .tag-badge { display: inline-flex; align-items: center; min-height: 22px; padding: 2px 9px; border-radius: 999px; font-size: 0.76rem; font-weight: 700; }
       .status-badge { display: inline-flex; align-items: center; gap: 6px; padding: 2px 10px; border-radius: 20px; font-size: 0.8rem; font-weight: 600; background: #f1f5f9; color: #94a3b8; }
       .status-badge .status-dot { width: 8px; height: 8px; border-radius: 50%; background: currentColor; }
       .status-badge.status-up { background: #dcfce7; color: #16a34a; }
@@ -304,5 +322,16 @@ export class HostDetailComponent implements OnInit {
     return metricKey
       .replace(/[._-]+/g, ' ')
       .replace(/\b\w/g, (segment) => segment.toUpperCase());
+  }
+
+  protected tagTextColor(color: string) {
+    const hex = color.replace('#', '');
+    if (hex.length !== 6) {
+      return '#ffffff';
+    }
+    const red = Number.parseInt(hex.slice(0, 2), 16);
+    const green = Number.parseInt(hex.slice(2, 4), 16);
+    const blue = Number.parseInt(hex.slice(4, 6), 16);
+    return red * 0.299 + green * 0.587 + blue * 0.114 > 150 ? '#0f172a' : '#ffffff';
   }
 }

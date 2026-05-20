@@ -4,7 +4,7 @@ import { FormsModule } from '@angular/forms';
 import { ApiService } from '../../core/http/api.service';
 import { SearchableSelectComponent, type SearchableSelectOption } from '../../core/layout/searchable-select.component';
 import { normalizeSearchText } from '../../core/utils/search.util';
-import type { DeviceDto } from '@nms/shared';
+import type { DeviceDto, DeviceTagDto } from '@nms/shared';
 
 interface DeviceGroupOption extends SearchableSelectOption {}
 interface DeviceTypeCatalogItem {
@@ -27,13 +27,13 @@ interface SiteOption extends SearchableSelectOption {}
 
       <ng-container *ngIf="activeTab() === 'general'">
         <div class="form-group">
-          <label for="name">Host Name *</label>
-          <input id="name" type="text" [(ngModel)]="form.name" name="name" required minlength="2" placeholder="e.g. Core Switch 01" />
+          <label for="description">Description *</label>
+          <input id="description" type="text" [(ngModel)]="form.description" name="description" required minlength="2" placeholder="e.g. Core switch in rack A" />
         </div>
 
         <div class="form-group">
-          <label for="ip">IP Address *</label>
-          <input id="ip" type="text" [(ngModel)]="form.ip" name="ip" required placeholder="e.g. 192.168.1.1" />
+          <label for="ip">IP/Hostname *</label>
+          <input id="ip" type="text" [(ngModel)]="form.ip" name="ip" required placeholder="e.g. 192.168.1.1 or core-switch.example.com" />
         </div>
 
         <div class="form-group">
@@ -83,6 +83,50 @@ interface SiteOption extends SearchableSelectOption {}
         </div>
 
         <div class="form-group">
+          <label>Tags</label>
+          <div class="tag-editor">
+            <div class="tag-list" *ngIf="form.tags.length > 0">
+              <span
+                class="tag-chip"
+                *ngFor="let tag of form.tags; let index = index"
+                [style.background-color]="tag.color"
+                [style.color]="tagTextColor(tag.color)"
+              >
+                <span>{{ tag.name }}</span>
+                <button type="button" class="tag-remove" title="Remove tag" (click)="removeTag(index)">
+                  <span class="material-icons">close</span>
+                </button>
+              </span>
+            </div>
+
+            <div class="tag-controls">
+              <input
+                class="tag-name-input"
+                type="text"
+                [(ngModel)]="newTagName"
+                name="newTagName"
+                maxlength="40"
+                placeholder="Tag name"
+                (keydown.enter)="addTag(); $event.preventDefault()"
+              />
+              <input class="tag-color-input" type="color" [(ngModel)]="newTagColor" name="newTagColor" title="Tag color" />
+              <button type="button" class="tag-add" title="Add tag" (click)="addTag()" [disabled]="!newTagName.trim() || form.tags.length >= 12">
+                <span class="material-icons">add</span>
+              </button>
+            </div>
+
+            <div class="tag-swatches">
+              <button
+                type="button"
+                class="tag-swatch"
+                *ngFor="let color of tagPalette"
+                [class.active]="newTagColor === color"
+                [style.background-color]="color"
+                [title]="color"
+                (click)="selectTagColor(color)"
+              ></button>
+            </div>
+          </div>
         </div>
 
         <div class="form-group" *ngIf="deviceGroups().length > 0">
@@ -243,6 +287,92 @@ interface SiteOption extends SearchableSelectOption {}
         border-color: #3b82f6;
         box-shadow: 0 0 0 3px rgba(59,130,246,0.1);
       }
+      .tag-editor {
+        display: flex;
+        flex-direction: column;
+        gap: 10px;
+      }
+      .tag-list,
+      .tag-swatches {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 8px;
+      }
+      .tag-chip {
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+        min-height: 26px;
+        padding: 3px 8px 3px 10px;
+        border-radius: 999px;
+        font-size: 0.78rem;
+        font-weight: 700;
+      }
+      .tag-remove {
+        width: 18px;
+        height: 18px;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        border: none;
+        border-radius: 999px;
+        background: rgba(255,255,255,0.24);
+        color: inherit;
+        cursor: pointer;
+        padding: 0;
+      }
+      .tag-remove .material-icons {
+        font-size: 14px;
+      }
+      .tag-controls {
+        display: grid;
+        grid-template-columns: minmax(0, 1fr) 42px 42px;
+        gap: 8px;
+        align-items: center;
+      }
+      .tag-name-input {
+        width: 100%;
+        min-width: 0;
+      }
+      .tag-color-input {
+        width: 42px;
+        height: 38px;
+        padding: 3px;
+        border: 1px solid #e2e8f0;
+        border-radius: 10px;
+        background: #fff;
+        cursor: pointer;
+      }
+      .tag-add {
+        width: 42px;
+        height: 38px;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        border: none;
+        border-radius: 10px;
+        background: #3b82f6;
+        color: #fff;
+        cursor: pointer;
+      }
+      .tag-add:disabled {
+        opacity: 0.55;
+        cursor: not-allowed;
+      }
+      .tag-add .material-icons {
+        font-size: 20px;
+      }
+      .tag-swatch {
+        width: 22px;
+        height: 22px;
+        border: 2px solid #fff;
+        border-radius: 999px;
+        box-shadow: 0 0 0 1px #cbd5e1;
+        cursor: pointer;
+      }
+      .tag-swatch.active {
+        box-shadow: 0 0 0 2px #1e293b;
+      }
 
       .form-section {
         display: flex;
@@ -345,10 +475,14 @@ export class HostFormComponent implements OnInit {
   protected readonly sites = signal<SiteOption[]>([]);
   protected readonly deviceGroups = signal<DeviceGroupOption[]>([]);
   protected readonly activeTab = signal<'general' | 'snmp'>('general');
+  protected readonly tagPalette = ['#2563EB', '#16A34A', '#DC2626', '#D97706', '#7C3AED', '#0891B2', '#DB2777', '#475569'];
+  protected newTagName = '';
+  protected newTagColor = '#2563EB';
 
   protected form = {
-    name: '',
+    description: '',
     ip: '',
+    tags: [] as DeviceTagDto[],
     vendor: '',
     type: '',
     siteId: '',
@@ -366,8 +500,9 @@ export class HostFormComponent implements OnInit {
   ngOnInit() {
     if (this.host) {
       this.form = {
-        name: this.host.name,
+        description: this.host.description,
         ip: this.host.ip,
+        tags: [...(this.host.tags ?? [])],
         vendor: this.host.vendor ?? '',
         type: this.host.type ?? '',
         siteId: this.host.siteId ?? '',
@@ -429,8 +564,9 @@ export class HostFormComponent implements OnInit {
     const snmp = this.buildSnmpPayload();
 
     const payload = {
-      name: this.form.name.trim(),
+      description: this.form.description.trim(),
       ip: this.form.ip.trim(),
+      tags: this.form.tags,
       vendor: this.form.vendor.trim() || null,
       type: this.form.type.trim() || null,
       siteId: this.form.siteId || null,
@@ -499,6 +635,42 @@ export class HostFormComponent implements OnInit {
     }
 
     this.refreshDeviceTypes();
+  }
+
+  protected addTag() {
+    const name = this.newTagName.trim();
+    if (!name) {
+      return;
+    }
+
+    const color = this.newTagColor.toUpperCase();
+    const nextTag = { name, color };
+    const existingIndex = this.form.tags.findIndex((tag) => tag.name.toLocaleLowerCase('sk') === name.toLocaleLowerCase('sk'));
+    if (existingIndex >= 0) {
+      this.form.tags = this.form.tags.map((tag, index) => (index === existingIndex ? nextTag : tag));
+    } else if (this.form.tags.length < 12) {
+      this.form.tags = [...this.form.tags, nextTag];
+    }
+    this.newTagName = '';
+  }
+
+  protected removeTag(index: number) {
+    this.form.tags = this.form.tags.filter((_, itemIndex) => itemIndex !== index);
+  }
+
+  protected selectTagColor(color: string) {
+    this.newTagColor = color;
+  }
+
+  protected tagTextColor(color: string) {
+    const hex = color.replace('#', '');
+    if (hex.length !== 6) {
+      return '#ffffff';
+    }
+    const red = Number.parseInt(hex.slice(0, 2), 16);
+    const green = Number.parseInt(hex.slice(2, 4), 16);
+    const blue = Number.parseInt(hex.slice(4, 6), 16);
+    return red * 0.299 + green * 0.587 + blue * 0.114 > 150 ? '#0f172a' : '#ffffff';
   }
 
   private buildSnmpPayload() {

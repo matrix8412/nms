@@ -40,7 +40,7 @@ export async function getDeviceGroupById(id: string, session: NonNullable<Sessio
           device: {
             select: {
               id: true,
-              name: true,
+              description: true,
               ip: true,
             },
           },

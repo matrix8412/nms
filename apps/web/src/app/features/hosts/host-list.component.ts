@@ -10,7 +10,7 @@ import { matchesSearchText, normalizeSearchText } from '../../core/utils/search.
 import { HostFormComponent } from './host-form.component';
 import type { DeviceDto } from '@nms/shared';
 
-type SortField = 'icmpStatus' | 'name' | 'ip' | 'vendor' | 'type' | 'site';
+type SortField = 'icmpStatus' | 'description' | 'ip' | 'vendor' | 'type' | 'tags' | 'site';
 type SortDir = 'asc' | 'desc';
 
 @Component({
@@ -58,22 +58,22 @@ type SortDir = 'asc' | 'desc';
               </th>
               <th class="sortable">
                 <div class="header-cell">
-                  <button type="button" class="header-sort" (click)="toggleSort('name')">
-                    Name
-                    <span class="sort-icon material-icons">{{ getSortIcon('name') }}</span>
+                  <button type="button" class="header-sort" (click)="toggleSort('description')">
+                    Description
+                    <span class="sort-icon material-icons">{{ getSortIcon('description') }}</span>
                   </button>
-                  <app-column-filter-trigger [active]="!!filterName" label="Filter name">
-                    <input type="text" class="th-filter" placeholder="Search..." [(ngModel)]="filterName" (ngModelChange)="applyFilter()" />
+                  <app-column-filter-trigger [active]="!!filterDescription" label="Filter description">
+                    <input type="text" class="th-filter" placeholder="Search..." [(ngModel)]="filterDescription" (ngModelChange)="applyFilter()" />
                   </app-column-filter-trigger>
                 </div>
               </th>
               <th class="sortable">
                 <div class="header-cell">
                   <button type="button" class="header-sort" (click)="toggleSort('ip')">
-                    IP Address
+                    IP/Hostname
                     <span class="sort-icon material-icons">{{ getSortIcon('ip') }}</span>
                   </button>
-                  <app-column-filter-trigger [active]="!!filterIp" label="Filter IP address">
+                  <app-column-filter-trigger [active]="!!filterIp" label="Filter IP/hostname">
                     <input type="text" class="th-filter" placeholder="Search..." [(ngModel)]="filterIp" (ngModelChange)="applyFilter()" />
                   </app-column-filter-trigger>
                 </div>
@@ -130,6 +130,23 @@ type SortDir = 'asc' | 'desc';
               </th>
               <th class="sortable">
                 <div class="header-cell">
+                  <button type="button" class="header-sort" (click)="toggleSort('tags')">
+                    Tags
+                    <span class="sort-icon material-icons">{{ getSortIcon('tags') }}</span>
+                  </button>
+                  <app-column-filter-trigger [active]="!!filterTag" label="Filter tags">
+                    <app-searchable-select
+                      [(ngModel)]="filterTag"
+                      (ngModelChange)="applyFilter()"
+                      [ngModelOptions]="{ standalone: true }"
+                      [options]="tagOptions()"
+                      placeholder="All"
+                      searchPlaceholder="Search tags"
+                      emptyOptionLabel="All"
+                      emptyStateLabel="No matching tags"
+                      [compact]="true"
+                    />
+                  </app-column-filter-trigger>
                 </div>
               </th>
               <th class="sortable">
@@ -176,7 +193,7 @@ type SortDir = 'asc' | 'desc';
                 <td>
                   <div class="host-cell">
                     <div class="host-copy">
-                      <a [routerLink]="['/hosts', host.id]" class="host-link">{{ host.name }}</a>
+                      <a [routerLink]="['/hosts', host.id]" class="host-link">{{ host.description }}</a>
                       <div class="host-meta" *ngIf="host.snmpHostname || host.snmpSoftwareVersion">
                         {{ host.snmpHostname || host.snmpSoftwareVersion }}
                       </div>
@@ -194,6 +211,19 @@ type SortDir = 'asc' | 'desc';
                     <span class="type-badge" *ngFor="let group of host.deviceGroups">{{ group.name }}</span>
                   </div>
                   <ng-template #noDeviceGroups>—</ng-template>
+                </td>
+                <td>
+                  <div class="tag-badges" *ngIf="host.tags?.length; else noTags">
+                    <span
+                      class="tag-badge"
+                      *ngFor="let tag of host.tags"
+                      [style.background-color]="tag.color"
+                      [style.color]="tagTextColor(tag.color)"
+                    >
+                      {{ tag.name }}
+                    </span>
+                  </div>
+                  <ng-template #noTags>—</ng-template>
                 </td>
                 <td>
                   <span class="type-badge" *ngIf="host.site">{{ host.site.name }}</span>
@@ -241,7 +271,7 @@ type SortDir = 'asc' | 'desc';
     <div class="confirm-overlay" *ngIf="deletingHost()" (click)="deletingHost.set(null)">
       <div class="confirm-dialog" (click)="$event.stopPropagation()">
         <h3>Delete Host</h3>
-        <p>Are you sure you want to delete <strong>{{ deletingHost()?.name }}</strong>?</p>
+        <p>Are you sure you want to delete <strong>{{ deletingHost()?.description }}</strong>?</p>
         <div class="confirm-actions">
           <button class="btn btn-secondary" (click)="deletingHost.set(null)">Cancel</button>
           <button class="btn btn-danger" (click)="deleteHost()">Delete</button>
@@ -453,7 +483,17 @@ type SortDir = 'asc' | 'desc';
         font-size: 0.78rem;
         font-weight: 600;
       }
-      .group-badges {
+      .tag-badge {
+        display: inline-flex;
+        align-items: center;
+        min-height: 22px;
+        padding: 2px 9px;
+        border-radius: 999px;
+        font-size: 0.76rem;
+        font-weight: 700;
+      }
+      .group-badges,
+      .tag-badges {
         display: flex;
         flex-wrap: wrap;
         gap: 6px;
@@ -607,11 +647,12 @@ export class HostListComponent implements OnInit, OnDestroy {
     { value: 'UNKNOWN', label: 'Unknown' },
   ];
 
-  protected filterName = '';
+  protected filterDescription = '';
   protected filterIp = '';
   protected filterVendor = '';
   protected filterType = '';
   protected filterDeviceGroup = '';
+  protected filterTag = '';
   protected filterSite = '';
   protected filterStatus = '';
   protected readonly loading = signal(true);
@@ -622,6 +663,7 @@ export class HostListComponent implements OnInit, OnDestroy {
 
   protected readonly availableTypes = signal<string[]>([]);
   protected readonly availableDeviceGroups = signal<string[]>([]);
+  protected readonly availableTags = signal<string[]>([]);
   protected readonly availableSites = signal<string[]>([]);
   protected readonly filteredHosts = signal<DeviceDto[]>([]);
   protected readonly expandedHostIds = signal<string[]>([]);
@@ -630,6 +672,9 @@ export class HostListComponent implements OnInit, OnDestroy {
   );
   protected readonly deviceGroupOptions = computed<SearchableSelectOption[]>(() =>
     this.availableDeviceGroups().map((group) => ({ value: group, label: group })),
+  );
+  protected readonly tagOptions = computed<SearchableSelectOption[]>(() =>
+    this.availableTags().map((tag) => ({ value: tag, label: tag })),
   );
   protected readonly siteOptions = computed<SearchableSelectOption[]>(() =>
     this.availableSites().map((site) => ({ value: site, label: site })),
@@ -671,6 +716,7 @@ export class HostListComponent implements OnInit, OnDestroy {
         this.hosts.set(res.data);
         this.extractTypes(res.data);
         this.extractDeviceGroups(res.data);
+        this.extractTags(res.data);
         this.extractSites(res.data);
         this.applyFilter();
         this.loading.set(false);
@@ -686,6 +732,7 @@ export class HostListComponent implements OnInit, OnDestroy {
         this.hosts.set(res.data);
         this.extractTypes(res.data);
         this.extractDeviceGroups(res.data);
+        this.extractTags(res.data);
         this.extractSites(res.data);
         this.applyFilter();
       },
@@ -710,6 +757,16 @@ export class HostListComponent implements OnInit, OnDestroy {
     this.availableDeviceGroups.set([...groups].sort());
   }
 
+  private extractTags(devices: DeviceDto[]) {
+    const tags = new Set<string>();
+    for (const device of devices) {
+      for (const tag of device.tags ?? []) {
+        if (tag.name) tags.add(tag.name);
+      }
+    }
+    this.availableTags.set([...tags].sort());
+  }
+
   private extractSites(devices: DeviceDto[]) {
     const sites = new Set<string>();
     for (const device of devices) {
@@ -721,20 +778,22 @@ export class HostListComponent implements OnInit, OnDestroy {
   }
 
   protected applyFilter() {
-    const name = normalizeSearchText(this.filterName);
+    const description = normalizeSearchText(this.filterDescription);
     const ip = normalizeSearchText(this.filterIp);
     const vendor = normalizeSearchText(this.filterVendor);
     const type = normalizeSearchText(this.filterType);
     const deviceGroup = normalizeSearchText(this.filterDeviceGroup);
+    const tag = normalizeSearchText(this.filterTag);
     const site = normalizeSearchText(this.filterSite);
     const status = this.filterStatus;
     this.filteredHosts.set(
       this.hosts().filter((h) =>
-        matchesSearchText(h.name, name) &&
+        matchesSearchText(h.description, description) &&
         matchesSearchText(h.ip, ip) &&
         matchesSearchText(h.vendor, vendor) &&
         matchesSearchText(h.type, type) &&
         (!deviceGroup || (h.deviceGroups ?? []).some((group) => matchesSearchText(group.name, deviceGroup))) &&
+        (!tag || (h.tags ?? []).some((item) => matchesSearchText(item.name, tag))) &&
         matchesSearchText(h.site?.name, site) &&
         (!status || h.icmpStatus === status)
       ),
@@ -759,14 +818,16 @@ export class HostListComponent implements OnInit, OnDestroy {
     switch (field) {
       case 'icmpStatus':
         return (host.icmpStatus ?? '').toString().toLowerCase();
-      case 'name':
-        return (host.name ?? '').toString().toLowerCase();
+      case 'description':
+        return (host.description ?? '').toString().toLowerCase();
       case 'ip':
         return (host.ip ?? '').toString().toLowerCase();
       case 'vendor':
         return (host.vendor ?? '').toString().toLowerCase();
       case 'type':
         return (host.type ?? '').toString().toLowerCase();
+      case 'tags':
+        return (host.tags ?? []).map((tag) => tag.name.toLowerCase()).join(' ');
       case 'site':
         return (host.site?.name ?? '').toString().toLowerCase();
       default:
@@ -818,6 +879,17 @@ export class HostListComponent implements OnInit, OnDestroy {
     return `${dayPart}${hours}h ${minutes}m ${seconds}s`.trim();
   }
 
+  protected tagTextColor(color: string) {
+    const hex = color.replace('#', '');
+    if (hex.length !== 6) {
+      return '#ffffff';
+    }
+    const red = Number.parseInt(hex.slice(0, 2), 16);
+    const green = Number.parseInt(hex.slice(2, 4), 16);
+    const blue = Number.parseInt(hex.slice(4, 6), 16);
+    return red * 0.299 + green * 0.587 + blue * 0.114 > 150 ? '#0f172a' : '#ffffff';
+  }
+
   protected viewHost(host: DeviceDto) {
     this.router.navigate(['/hosts', host.id]);
   }
@@ -837,4 +909,3 @@ export class HostListComponent implements OnInit, OnDestroy {
     });
   }
 }
-

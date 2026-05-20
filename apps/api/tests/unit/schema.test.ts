@@ -20,9 +20,30 @@ describe('registerSchema', () => {
 });
 
 describe('device SNMP schemas', () => {
+  it('accepts hostnames and colored tags on create', () => {
+    const parsed = deviceCreateSchema.safeParse({
+      description: 'Router 01',
+      ip: 'core-router.example.com',
+      tags: [{ name: 'Core', color: '#2563EB' }],
+      deviceGroupIds: [],
+    });
+
+    expect(parsed.success).toBe(true);
+  });
+
+  it('rejects invalid hostnames', () => {
+    const parsed = deviceCreateSchema.safeParse({
+      description: 'Router 01',
+      ip: 'core-router;reboot',
+      deviceGroupIds: [],
+    });
+
+    expect(parsed.success).toBe(false);
+  });
+
   it('requires SNMP v2c community on create', () => {
     const parsed = deviceCreateSchema.safeParse({
-      name: 'Router 01',
+      description: 'Router 01',
       ip: '10.0.0.1',
       snmp: {
         version: 'V2C',

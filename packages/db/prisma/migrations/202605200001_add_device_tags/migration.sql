@@ -1,0 +1,2 @@
+ALTER TABLE "Device"
+ADD COLUMN "tags" JSONB NOT NULL DEFAULT '[]'::jsonb;

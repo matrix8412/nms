@@ -62,8 +62,8 @@ import type { DeviceDto } from '@nms/shared';
             <thead>
               <tr>
                 <th>Status</th>
-                <th>Name</th>
-                <th>IP Address</th>
+                <th>Description</th>
+                <th>IP/Hostname</th>
                 <th>Vendor</th>
                 <th>Type</th>
               </tr>
@@ -77,7 +77,7 @@ import type { DeviceDto } from '@nms/shared';
                         [class.status-unknown]="host.icmpStatus === 'UNKNOWN'"></span>
                 </td>
                 <td>
-                  <a [routerLink]="['/hosts', host.id]" class="host-link">{{ host.name }}</a>
+                  <a [routerLink]="['/hosts', host.id]" class="host-link">{{ host.description }}</a>
                 </td>
                 <td class="mono">{{ host.ip }}</td>
                 <td>{{ host.vendor || '—' }}</td>

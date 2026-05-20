@@ -25,8 +25,9 @@ export class ApiService {
   }
 
   createDevice(payload: {
-    name: string;
+    description: string;
     ip: string;
+    tags?: Array<{ name: string; color: string }>;
     vendor?: string | null;
     type?: string | null;
     siteId?: string | null;
@@ -48,8 +49,9 @@ export class ApiService {
   updateDevice(
     deviceId: string,
     payload: {
-      name?: string;
+      description?: string;
       ip?: string;
+      tags?: Array<{ name: string; color: string }>;
       vendor?: string | null;
       type?: string | null;
       siteId?: string | null;

@@ -37,6 +37,33 @@ export const assignGroupMembersSchema = z.object({
 const snmpVersionSchema = z.enum(['V2C', 'V3']);
 const snmpAuthProtocolSchema = z.enum(['MD5', 'SHA']);
 const snmpPrivProtocolSchema = z.enum(['DES', 'AES']);
+const hostnameLabelPattern = /^[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?$/i;
+
+function isValidHostname(value: string) {
+  if (/^\d+(?:\.\d+){3}$/.test(value)) {
+    return false;
+  }
+
+  return value
+    .split('.')
+    .every((label) => hostnameLabelPattern.test(label));
+}
+
+const ipOrHostnameSchema = z
+  .string()
+  .trim()
+  .min(1)
+  .max(253)
+  .refine((value) => z.ipv4().safeParse(value).success || isValidHostname(value), {
+    message: 'Must be a valid IPv4 address or hostname',
+  });
+
+const deviceTagSchema = z.object({
+  name: z.string().trim().min(1).max(40),
+  color: z.string().trim().regex(/^#[0-9a-fA-F]{6}$/),
+});
+
+const deviceTagsSchema = z.array(deviceTagSchema).max(12);
 
 const deviceSnmpSchema = z
   .object({
@@ -119,8 +146,9 @@ const deviceSnmpUpdateSchema = z
   });
 
 export const deviceCreateSchema = z.object({
-  name: z.string().trim().min(2).max(120),
-  ip: z.ipv4(),
+  description: z.string().trim().min(2).max(120),
+  ip: ipOrHostnameSchema,
+  tags: deviceTagsSchema.default([]),
   vendor: z.string().trim().max(120).optional().nullable(),
   type: z.string().trim().max(120).optional().nullable(),
   siteId: z.string().trim().min(1).max(120).optional().nullable(),
@@ -129,8 +157,9 @@ export const deviceCreateSchema = z.object({
 });
 
 export const deviceUpdateSchema = z.object({
-  name: z.string().trim().min(2).max(120).optional(),
-  ip: z.ipv4().optional(),
+  description: z.string().trim().min(2).max(120).optional(),
+  ip: ipOrHostnameSchema.optional(),
+  tags: deviceTagsSchema.optional(),
   vendor: z.string().trim().max(120).optional().nullable(),
   type: z.string().trim().max(120).optional().nullable(),
   siteId: z.string().trim().min(1).max(120).optional().nullable(),
@@ -150,4 +179,3 @@ export const userUpdateSchema = z.object({
   role: z.enum(['USER', 'ADMIN']).optional(),
   groupIds: z.array(z.string().min(1)).optional(),
 });
-

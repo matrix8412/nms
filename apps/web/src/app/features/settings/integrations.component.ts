@@ -66,7 +66,7 @@ const MODULES: ModuleDef[] = [
       </div>
     </div>
 
-    <app-slide-panel [isOpen]="panelOpen()" [title]="editingModule()?.label + ' Configuration'" (close)="panelOpen.set(false)">
+    <app-slide-panel [isOpen]="panelOpen()" [title]="editingModule() ? editingModule()!.label + ' Configuration' : ''" (close)="panelOpen.set(false)">
       <form *ngIf="editingModule() as m" (ngSubmit)="saveConfig()" class="panel-form">
         <label class="form-label toggle-row">
           <span>Enabled</span>
@@ -85,7 +85,73 @@ const MODULES: ModuleDef[] = [
       </form>
     </app-slide-panel>
   `,
-  styles: [``],
+  styles: [`
+    .page-header { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 24px; flex-wrap: wrap; gap: 12px; }
+    .page-header h1 { margin: 0 0 4px; font-size: 1.5rem; font-weight: 700; color: #1a2332; }
+    .subtitle { margin: 0; color: #64748b; font-size: 0.9rem; }
+    .modules-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(320px, 1fr)); gap: 20px; }
+    .module-card {
+      display: flex;
+      flex-direction: column;
+      gap: 18px;
+      padding: 22px;
+      border: 1px solid #e2e8f0;
+      border-radius: 16px;
+      background: linear-gradient(180deg, #ffffff 0%, #f8fafc 100%);
+      box-shadow: 0 14px 34px rgba(15, 23, 42, 0.06);
+    }
+    .module-header { display: flex; align-items: flex-start; gap: 14px; }
+    .module-icon {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      width: 48px;
+      height: 48px;
+      border-radius: 14px;
+      background: #dbeafe;
+      color: #2563eb;
+      font-size: 1.5rem;
+      flex-shrink: 0;
+    }
+    .module-label { font-size: 1rem; font-weight: 700; color: #0f172a; margin-bottom: 4px; }
+    .module-desc { color: #64748b; font-size: 0.9rem; line-height: 1.5; }
+    .module-footer { display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap; }
+    .status-badge {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 0.78rem;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.4px;
+      padding: 4px 10px;
+      border-radius: 999px;
+      background: #fee2e2;
+      color: #dc2626;
+    }
+    .status-badge.enabled { background: #dcfce7; color: #16a34a; }
+    .btn { display: inline-flex; align-items: center; justify-content: center; gap: 6px; padding: 8px 18px; border: none; border-radius: 8px; font-weight: 600; font-size: 0.88rem; cursor: pointer; transition: background .15s; }
+    .btn-sm { padding: 7px 14px; font-size: 0.82rem; }
+    .btn-primary { background: #3b82f6; color: #fff; }
+    .btn-primary:hover { background: #2563eb; }
+    .btn-outline { background: #fff; color: #475569; border: 1px solid #e2e8f0; }
+    .btn-outline:hover { background: #f8fafc; }
+    .panel-form { display: flex; flex-direction: column; gap: 16px; padding: 20px; }
+    .form-label { display: flex; flex-direction: column; gap: 6px; font-size: 0.84rem; font-weight: 600; color: #334155; }
+    .form-input { padding: 8px 12px; border: 1px solid #e2e8f0; border-radius: 8px; font-size: 0.88rem; font-family: inherit; }
+    .form-input:focus { outline: none; border-color: #3b82f6; box-shadow: 0 0 0 3px rgba(59,130,246,.12); }
+    .toggle-row { flex-direction: row; align-items: center; justify-content: space-between; }
+    .toggle { width: 18px; height: 18px; accent-color: #2563eb; }
+    .panel-actions { display: flex; gap: 10px; justify-content: flex-end; margin-top: 8px; }
+
+    @media (max-width: 640px) {
+      .module-card { padding: 18px; }
+      .module-footer { align-items: stretch; }
+      .module-footer .btn { width: 100%; }
+      .panel-actions { flex-direction: column-reverse; }
+      .panel-actions .btn { width: 100%; }
+    }
+  `],
 })
 export class IntegrationsComponent implements OnInit {
   private readonly api = inject(ApiService);
