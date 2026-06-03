@@ -3,19 +3,13 @@ import { Component, computed, inject, OnInit, signal } from '@angular/core';
 import { ActivatedRoute, Router, RouterLink } from '@angular/router';
 import { ApiService } from '../../core/http/api.service';
 import { SlidePanelComponent } from '../../core/layout/slide-panel.component';
-import {
-  TimeSeriesChartComponent,
-  type TimeSeriesChartPoint,
-  type TimeSeriesChartRangeOption,
-  type TimeSeriesChartSeries,
-} from '../../core/layout/time-series-chart.component';
 import { HostFormComponent } from './host-form.component';
 import type { DeviceDto } from '@nms/shared';
 
 @Component({
   selector: 'app-host-detail',
   standalone: true,
-  imports: [CommonModule, RouterLink, SlidePanelComponent, HostFormComponent, TimeSeriesChartComponent],
+  imports: [CommonModule, RouterLink, SlidePanelComponent, HostFormComponent],
   template: `
     <div class="page-header">
       <div class="breadcrumb">
@@ -114,20 +108,6 @@ import type { DeviceDto } from '@nms/shared';
         </div>
       </div>
 
-      <div class="info-card">
-        <div class="card-title">
-          <span class="material-icons">show_chart</span>
-          Recent Metrics
-        </div>
-        <app-time-series-chart
-          title="ICMP History"
-          subtitle="Packet loss and response"
-          [points]="icmpChartData()"
-          [series]="icmpChartSeries"
-          [ranges]="icmpChartRanges"
-          emptyText="No ICMP history collected yet."
-        />
-      </div>
     </div>
 
     <div class="info-card interfaces-card" *ngIf="host() && activeTab() === 'interfaces'">
@@ -237,7 +217,6 @@ export class HostDetailComponent implements OnInit {
   private readonly api = inject(ApiService);
 
   protected readonly host = signal<DeviceDto | null>(null);
-  protected readonly icmpHistory = signal<Array<{ recordedAt: string; status: 'UP' | 'DOWN'; rttMs: number | null; packetLossPercent: number | null }>>([]);
   protected readonly activeTab = signal<'overview' | 'interfaces'>('overview');
   protected readonly editPanelOpen = signal(false);
   protected readonly error = signal('');
@@ -254,26 +233,6 @@ export class HostDetailComponent implements OnInit {
     Object.entries(this.host()?.snmpOverviewMetrics ?? {}).sort((a, b) => a[0].localeCompare(b[0])),
   );
 
-  protected readonly icmpChartData = computed<TimeSeriesChartPoint[]>(() => this.icmpHistory().map((point) => ({
-    timestamp: point.recordedAt,
-    values: {
-      packetLoss: point.packetLossPercent,
-      responseTime: point.rttMs,
-    },
-  })));
-
-  protected readonly icmpChartSeries: TimeSeriesChartSeries[] = [
-    { key: 'packetLoss', label: 'Packet loss', color: '#dc2626', axis: 'left', unit: '%', decimals: 1 },
-    { key: 'responseTime', label: 'Response', color: '#16a34a', axis: 'right', unit: 'ms', decimals: 1 },
-  ];
-
-  protected readonly icmpChartRanges: TimeSeriesChartRangeOption[] = [
-    { label: '1H', value: '1h', durationMs: 60 * 60 * 1000 },
-    { label: '6H', value: '6h', durationMs: 6 * 60 * 60 * 1000 },
-    { label: '24H', value: '24h', durationMs: 24 * 60 * 60 * 1000 },
-    { label: 'All', value: 'all' },
-  ];
-
   ngOnInit() {
     this.loadHost();
   }
@@ -289,7 +248,6 @@ export class HostDetailComponent implements OnInit {
       next: (res) => {
         this.host.set(res.data);
         this.activeTab.set('overview');
-        this.icmpHistory.set((res.data.icmpHistory ?? []) as Array<{ recordedAt: string; status: 'UP' | 'DOWN'; rttMs: number | null; packetLossPercent: number | null }>);
       },
       error: () => this.error.set('Host not found'),
     });
