@@ -43,7 +43,7 @@ async function main() {
     },
     select: {
       id: true,
-      name: true,
+      description: true,
       snmpCommunity: true,
       snmpAuthPassword: true,
       snmpPrivPassword: true,
@@ -81,7 +81,7 @@ async function main() {
     updatedFields += Number(snmpAuthPassword !== device.snmpAuthPassword);
     updatedFields += Number(snmpPrivPassword !== device.snmpPrivPassword);
 
-    console.log(`Re-encrypted SNMP secrets for ${device.name}`);
+    console.log(`Re-encrypted SNMP secrets for ${device.description}`);
   }
 
   console.log(`Backfill complete. Updated ${updatedDevices} devices and ${updatedFields} secret fields.`);

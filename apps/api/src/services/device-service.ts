@@ -345,7 +345,22 @@ async function mapSites(deviceIds: string[]) {
     where: { id: { in: deviceIds } },
     select: {
       id: true,
-      site: true,
+      site: {
+        select: {
+          id: true,
+          name: true,
+          street: true,
+          descriptiveNumber: true,
+          orientationNumber: true,
+          zipNumber: true,
+          city: true,
+          latitude: true,
+          longitude: true,
+          description: true,
+          createdAt: true,
+          updatedAt: true,
+        },
+      },
     },
   });
 
